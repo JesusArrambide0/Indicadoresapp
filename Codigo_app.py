@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime
 
 # Cargar datos desde Excel
-archivo_excel = "LlamadasTotales.xlsx"
+archivo_excel = "AppInfo.xlsx"
 df = pd.read_excel(archivo_excel)
 
 # Convertir las columnas de tiempo a datetime
