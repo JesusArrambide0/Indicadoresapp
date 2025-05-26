@@ -18,6 +18,10 @@ df["Agent Name"] = df["Agent Name"].replace(mapeo_a_nombre_completo)
 
 # Procesamiento inicial
 df["Call Start Time"] = pd.to_datetime(df["Call Start Time"], errors="coerce")
+
+# Eliminar filas con fechas inválidas
+df = df.dropna(subset=["Call Start Time"])
+
 df["Talk Time"] = pd.to_timedelta(df["Talk Time"], errors="coerce")
 df["Fecha"] = df["Call Start Time"].dt.date
 df["Hora"] = df["Call Start Time"].dt.hour
@@ -78,17 +82,15 @@ df_filtrado = df[(df["Fecha"] >= fecha_inicio) & (df["Fecha"] <= fecha_fin)]
 df_expandido_filtrado = df_expandido[(df_expandido["Fecha"] >= fecha_inicio) & (df_expandido["Fecha"] <= fecha_fin)]
 
 # Productividad general diaria
-df_productividad = df_filtrado.groupby(df_filtrado["Call Start Time"].dt.date).agg(
+df_productividad = df_filtrado.groupby("Fecha").agg(
     LlamadasRecibidas=("Talk Time", "count"),
     LlamadasPerdidas=("Talk Time", lambda x: (x == pd.Timedelta("0:00:00")).sum())
-).reset_index().rename(columns={"Call Start Time": "Fecha"})
+).reset_index()
 
 df_productividad["Productividad (%)"] = (
     (df_productividad["LlamadasRecibidas"] - df_productividad["LlamadasPerdidas"]) / df_productividad["LlamadasRecibidas"] * 100
 ).round(2)
 df_productividad["Tasa de Abandono (%)"] = 100 - df_productividad["Productividad (%)"]
-
-# Aquí está la corrección importante:
 df_productividad["DíaSemana"] = pd.to_datetime(df_productividad["Fecha"]).dt.day_name().map(dias_traducidos)
 
 # Detalle diario por programador
@@ -198,19 +200,26 @@ with tab5:
     alertas = []
 
     for agente in resumen_agente_hora["AgenteFinal"].unique():
-        df_agente_hora = resumen_agente_hora[resumen_agente_hora["AgenteFinal"] == agente].sort_values("Hora")
-        for i in range(1, len(df_agente_hora) - 1):
-            llamadas_antes = df_agente_hora.iloc[i-1]["TotalLlamadas"]
-            llamadas_actual = df_agente_hora.iloc[i]["TotalLlamadas"]
-            llamadas_despues = df_agente_hora.iloc[i+1]["TotalLlamadas"]
+        data_agente = resumen_agente_hora[resumen_agente_hora["AgenteFinal"] == agente]
 
-            # Detectar si el número de llamadas baja a 0 o muy bajo en la hora actual y luego vuelve a subir
-            if llamadas_antes >= 2 and llamadas_actual == 0 and llamadas_despues >= 2:
-                alertas.append(f"Alerta: En hora {df_agente_hora.iloc[i]['Hora']} el agente {agente} tuvo caída abrupta de llamadas.")
+        mean_total = data_agente["TotalLlamadas"].mean()
+        std_total = data_agente["TotalLlamadas"].std()
+        umbral_total = mean_total + 2 * std_total
+
+        for _, row in data_agente.iterrows():
+            if row["TotalLlamadas"] > umbral_total:
+                alertas.append(f"Alerta: {agente} tuvo un pico de llamadas ({row['TotalLlamadas']}) a la hora {row['Hora']}:00")
+
+        # Verificar si hubo hora sin llamadas entre horas con llamadas
+        horas_con_llamadas = sorted(data_agente[data_agente["TotalLlamadas"] > 0]["Hora"].unique())
+        for i in range(len(horas_con_llamadas) - 1):
+            if horas_con_llamadas[i+1] - horas_con_llamadas[i] > 1:
+                faltante = horas_con_llamadas[i] + 1
+                alertas.append(f"Alerta: {agente} no tuvo llamadas a la hora {faltante}:00 entre horas con actividad.")
 
     if alertas:
         for alerta in alertas:
             st.warning(alerta)
     else:
-        st.success("No se detectaron alertas de picos o pérdidas inusuales.")
+        st.success("No se detectaron alertas de picos o pérdidas de llamadas.")
 
