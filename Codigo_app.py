@@ -1,163 +1,106 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
+
+st.set_page_config(page_title="Análisis de Llamadas", layout="wide")
+
+st.title("📞 Análisis de productividad de llamadas")
 
 # Cargar archivo
-archivo_excel = "AppInfo.xlsx"
-df = pd.read_excel(archivo_excel, engine="openpyxl")
+archivo = st.file_uploader("Sube el archivo Excel", type=["xlsx"])
+if archivo is not None:
+    df = pd.read_excel(archivo)
 
-# Normalizar nombres
-mapeo_a_nombre_completo = {
-    "Jorge": "Jorge Cesar Flores Rivera",
-    "Maria": "Maria Teresa Loredo Morales",
-    "Jonathan": "Jonathan Alejandro Zúñiga",
-}
-df["Agent Name"] = df["Agent Name"].replace(mapeo_a_nombre_completo)
+    # Mostrar columnas disponibles para depuración
+    st.write("Columnas detectadas:", df.columns.tolist())
 
-# Procesamiento inicial
-df["Call Start Time"] = pd.to_datetime(df["Call Start Time"], errors="coerce")
-df["Talk Time"] = pd.to_timedelta(df["Talk Time"], errors="coerce")
-df["Fecha"] = df["Call Start Time"].dt.date
-df["Hora"] = df["Call Start Time"].dt.hour
-df["DíaSemana_En"] = df["Call Start Time"].dt.day_name()
+    columnas_requeridas = ["Agent Name", "Call Start Time", "Call End Time", "Call Type"]
+    faltantes = [col for col in columnas_requeridas if col not in df.columns]
 
-# Traducción de días
-dias_traducidos = {
-    "Monday": "Lunes", "Tuesday": "Martes", "Wednesday": "Miércoles",
-    "Thursday": "Jueves", "Friday": "Viernes", "Saturday": "Sábado", "Sunday": "Domingo"
-}
-df["DíaSemana"] = df["DíaSemana_En"].map(dias_traducidos)
+    if faltantes:
+        st.error(f"Faltan columnas necesarias en el archivo: {', '.join(faltantes)}")
+        st.stop()
 
-# Identificar llamadas perdidas por Talk Time
-df["LlamadaPerdida"] = df["Talk Time"] == pd.Timedelta("0:00:00")
+    # Convertir fechas
+    df["Call Start Time"] = pd.to_datetime(df["Call Start Time"], errors="coerce")
+    df["Call End Time"] = pd.to_datetime(df["Call End Time"], errors="coerce")
 
-# Asignar agente según horario
-def agentes_por_horario(hora):
-    if 8 <= hora < 10:
-        return ["Jorge Cesar Flores Rivera"]
-    elif 10 <= hora < 12:
-        return ["Jorge Cesar Flores Rivera", "Maria Teresa Loredo Morales"]
-    elif 12 <= hora < 16:
-        return ["Jorge Cesar Flores Rivera", "Maria Teresa Loredo Morales", "Jonathan Alejandro Zúñiga"]
-    elif 16 <= hora < 18:
-        return ["Jonathan Alejandro Zúñiga", "Maria Teresa Loredo Morales"]
-    elif 18 <= hora < 20:
-        return ["Jonathan Alejandro Zúñiga"]
-    return []
+    if df["Call Start Time"].isna().all():
+        st.error("Todos los valores en 'Call Start Time' son inválidos o están vacíos.")
+        st.stop()
 
-# Expandir filas
-df["AgenteFinal"] = df.apply(
-    lambda row: row["Agent Name"] if not row["LlamadaPerdida"]
-    else agentes_por_horario(row["Hora"])[0] if agentes_por_horario(row["Hora"])
-    else row["Agent Name"], axis=1
-)
-df_expandido = df[df["AgenteFinal"].notna()].copy()
+    # Crear columnas adicionales
+    df["Fecha"] = df["Call Start Time"].dt.date
+    df["Hora"] = df["Call Start Time"].dt.hour
+    df["Duración (min)"] = (df["Call End Time"] - df["Call Start Time"]).dt.total_seconds() / 60
+    df["Duración (min)"] = df["Duración (min)"].fillna(0)
 
-# Interfaz Streamlit
-st.title("Análisis Integral de Productividad y Llamadas")
+    # Normalizar nombres
+    df["Agent Name"] = df["Agent Name"].str.upper().str.strip()
 
-# Rango de fechas
-fecha_min, fecha_max = df["Fecha"].min(), df["Fecha"].max()
-fecha_inicio, fecha_fin = st.date_input("Selecciona un rango de fechas:", [fecha_min, fecha_max])
+    # Rango de fechas
+    if df["Fecha"].dropna().empty:
+        st.error("No se encontraron fechas válidas para filtrar.")
+        st.stop()
 
-# Filtrado
-df_filtrado = df[(df["Fecha"] >= fecha_inicio) & (df["Fecha"] <= fecha_fin)]
-df_expandido_filtrado = df_expandido[(df_expandido["Fecha"] >= fecha_inicio) & (df_expandido["Fecha"] <= fecha_fin)]
+    fecha_min, fecha_max = df["Fecha"].min(), df["Fecha"].max()
+    fecha_inicio = st.date_input("Desde", fecha_min, min_value=fecha_min, max_value=fecha_max)
+    fecha_fin = st.date_input("Hasta", fecha_max, min_value=fecha_min, max_value=fecha_max)
 
-# Productividad diaria
-df_productividad = df_filtrado.groupby("Fecha").agg(
-    LlamadasRecibidas=("Talk Time", "count"),
-    LlamadasPerdidas=("Talk Time", lambda x: (x == pd.Timedelta("0:00:00")).sum())
-).reset_index()
-df_productividad["Productividad (%)"] = (
-    (df_productividad["LlamadasRecibidas"] - df_productividad["LlamadasPerdidas"]) / df_productividad["LlamadasRecibidas"] * 100).round(2)
-df_productividad["Tasa de Abandono (%)"] = 100 - df_productividad["Productividad (%)"]
-df_productividad["DíaSemana"] = pd.to_datetime(df_productividad["Fecha"]).dt.day_name().map(dias_traducidos)
+    if fecha_inicio > fecha_fin:
+        st.warning("La fecha de inicio no puede ser mayor que la fecha de fin.")
+        st.stop()
 
-# Detalle diario por agente
-detalle = df_expandido_filtrado.groupby(["AgenteFinal", "Fecha"]).agg(
-    LlamadasTotales=("Talk Time", "count"),
-    LlamadasPerdidas=("LlamadaPerdida", "sum"),
-    TalkTimeTotal=("Talk Time", "sum")
-).reset_index()
-detalle["LlamadasAtendidas"] = detalle["LlamadasTotales"] - detalle["LlamadasPerdidas"]
-detalle["Productividad (%)"] = (detalle["LlamadasAtendidas"] / detalle["LlamadasTotales"] * 100).round(2)
-detalle["Promedio Talk Time (seg)"] = (detalle["TalkTimeTotal"].dt.total_seconds() / detalle["LlamadasAtendidas"]).round(2)
+    df_filtrado = df[(df["Fecha"] >= fecha_inicio) & (df["Fecha"] <= fecha_fin)]
 
-# Heatmaps
-dias_validos = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-dias_validos_es = [dias_traducidos[d] for d in dias_validos]
-horas_ordenadas = list(range(8, 21))
+    if df_filtrado.empty:
+        st.warning("No hay datos en el rango de fechas seleccionado.")
+        st.stop()
 
-pivot = df_filtrado[df_filtrado["DíaSemana_En"].isin(dias_validos)].pivot_table(
-    index="Hora", columns="DíaSemana_En", aggfunc="size", fill_value=0)
-pivot = pivot.reindex(columns=dias_validos).rename(columns=dias_traducidos).reindex(horas_ordenadas[::-1])
-pivot.index = [f"{h}:00" for h in pivot.index]
+    st.subheader("Resumen general")
 
-pivot_perdidas = df_expandido_filtrado[(df_expandido_filtrado["DíaSemana_En"].isin(dias_validos)) & (df_expandido_filtrado["LlamadaPerdida"])]
-pivot_perdidas = pivot_perdidas.pivot_table(index="Hora", columns="DíaSemana_En", aggfunc="size", fill_value=0)
-pivot_perdidas = pivot_perdidas.reindex(columns=dias_validos).rename(columns=dias_traducidos).reindex(horas_ordenadas[::-1])
-pivot_perdidas.index = [f"{h}:00" for h in pivot_perdidas.index]
+    total_llamadas = df_filtrado.shape[0]
+    total_entrantes = df_filtrado[df_filtrado["Call Type"].str.lower() == "incoming"].shape[0]
+    total_salientes = df_filtrado[df_filtrado["Call Type"].str.lower() == "outgoing"].shape[0]
+    duracion_promedio = df_filtrado["Duración (min)"].mean()
 
-# Tabs
-with st.tabs(["Productividad General", "Detalle por Programador", "Heatmap Llamadas", "Heatmap Llamadas Perdidas", "Distribución & Alertas"]) as (tab1, tab2, tab3, tab4, tab5):
-    with tab1:
-        st.header("Productividad y Tasa de Abandono Diaria")
-        st.dataframe(df_productividad)
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total de llamadas", total_llamadas)
+    col2.metric("Entrantes", total_entrantes)
+    col3.metric("Salientes", total_salientes)
+    col4.metric("Duración promedio (min)", f"{duracion_promedio:.2f}")
 
-    with tab2:
-        st.header("Detalle Diario por Programador")
-        agente = st.selectbox("Selecciona Programador", detalle["AgenteFinal"].unique())
-        st.dataframe(detalle[detalle["AgenteFinal"] == agente])
+    st.divider()
+    st.subheader("Llamadas por agente")
 
-    with tab3:
-        st.header("Distribución de llamadas por hora y día")
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(pivot, cmap="YlGnBu", annot=True, fmt="d", ax=ax)
-        ax.set_xlabel("Día de la Semana")
-        ax.set_ylabel("Hora del Día")
-        st.pyplot(fig)
+    llamadas_por_agente = df_filtrado.groupby("Agent Name").agg({
+        "Duración (min)": ["count", "sum", "mean"]
+    }).reset_index()
+    llamadas_por_agente.columns = ["Agente", "Cantidad", "Total min", "Promedio min"]
+    llamadas_por_agente = llamadas_por_agente.sort_values("Cantidad", ascending=False)
 
-    with tab4:
-        st.header("Distribución de llamadas perdidas por hora y día")
-        fig2, ax2 = plt.subplots(figsize=(10, 6))
-        sns.heatmap(pivot_perdidas, cmap="OrRd", annot=True, fmt="d", ax=ax2)
-        ax2.set_xlabel("Día de la Semana")
-        ax2.set_ylabel("Hora del Día")
-        st.pyplot(fig2)
+    st.dataframe(llamadas_por_agente, use_container_width=True)
 
-    with tab5:
-        st.header("Distribución y Promedio del Tiempo de Conversación")
-        agente = st.selectbox("Selecciona agente", df_expandido_filtrado["AgenteFinal"].unique(), key="dist")
-        df_agente = df_expandido_filtrado[(df_expandido_filtrado["AgenteFinal"] == agente) & (~df_expandido_filtrado["LlamadaPerdida"])]
+    st.divider()
+    st.subheader("Distribución por hora del día")
 
-        if not df_agente.empty:
-            tiempos = df_agente["Talk Time"].dt.total_seconds()
-            fig_hist, ax_hist = plt.subplots()
-            ax_hist.hist(tiempos, bins=30, color='skyblue', edgecolor='black')
-            ax_hist.set_title(f"Distribución de Talk Time - {agente}")
-            ax_hist.set_xlabel("Segundos")
-            ax_hist.set_ylabel("Frecuencia")
-            st.pyplot(fig_hist)
-            st.write(f"Promedio de Talk Time para {agente}: **{tiempos.mean():.2f} segundos**")
-        else:
-            st.write(f"No hay llamadas atendidas para {agente} en el rango seleccionado.")
+    llamadas_por_hora = df_filtrado.groupby("Hora").size()
+    fig, ax = plt.subplots()
+    llamadas_por_hora.plot(kind="bar", ax=ax)
+    ax.set_xlabel("Hora del día")
+    ax.set_ylabel("Número de llamadas")
+    ax.set_title("Llamadas por hora")
+    st.pyplot(fig)
 
-        st.header("Alertas de Picos o Pérdidas")
-        resumen = df_expandido_filtrado.groupby(["AgenteFinal", "Hora"]).agg(
-            TotalLlamadas=("Talk Time", "count"),
-            LlamadasPerdidas=("LlamadaPerdida", "sum")
-        ).reset_index()
+    st.divider()
+    st.subheader("Tendencia de llamadas por día")
 
-        for agente in resumen["AgenteFinal"].unique():
-            datos = resumen[resumen["AgenteFinal"] == agente]
-            umbral_llamadas = datos["TotalLlamadas"].mean() + 2 * datos["TotalLlamadas"].std()
-            umbral_perdidas = datos["LlamadasPerdidas"].mean() + 2 * datos["LlamadasPerdidas"].std()
-
-            for _, fila in datos.iterrows():
-                if fila["TotalLlamadas"] > umbral_llamadas:
-                    st.warning(f"⚠️ Pico de llamadas para {agente} a las {fila['Hora']}:00 - {int(fila['TotalLlamadas'])} llamadas.")
-                if fila["LlamadasPerdidas"] > umbral_perdidas:
-                    st.warning(f"⚠️ Pico de llamadas perdidas para {agente} a las {fila['Hora']}:00 - {int(fila['LlamadasPerdidas'])} perdidas.")
+    llamadas_por_fecha = df_filtrado.groupby("Fecha").size()
+    fig, ax = plt.subplots()
+    llamadas_por_fecha.plot(ax=ax)
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel("Número de llamadas")
+    ax.set_title("Tendencia diaria")
+    st.pyplot(fig)
