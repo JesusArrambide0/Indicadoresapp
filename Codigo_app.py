@@ -3,7 +3,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-archivo_excel = "App Info.xlsx"
+archivo_excel = "AppInfo.xlsx"
 df = pd.read_excel(archivo_excel, engine="openpyxl")
 
 # Normalizar nombres
