@@ -29,14 +29,6 @@ dias_traducidos = {
 }
 df["DíaSemana"] = df["DíaSemana_En"].map(dias_traducidos)
 
-# Asegurar que 'Fecha' sea datetime y sin nulos para evitar errores en st.date_input
-df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
-df = df.dropna(subset=['Fecha'])
-fechas_disponibles = df['Fecha'].sort_values().unique()
-
-fecha_inicio_default = pd.to_datetime(fechas_disponibles[0]).date()
-fecha_fin_default = pd.to_datetime(fechas_disponibles[-1]).date()
-
 # Llamadas perdidas
 df["LlamadaPerdida"] = df["Talk Time"] == pd.Timedelta("0:00:00")
 
@@ -75,6 +67,10 @@ df_expandido = df_expandido[df_expandido["AgenteFinal"].notna()]
 st.title("Análisis Integral de Productividad y Llamadas")
 
 # Filtro por fechas
+fechas_disponibles = df["Fecha"].sort_values().unique()
+fecha_inicio_default = fechas_disponibles[0]
+fecha_fin_default = fechas_disponibles[-1]
+
 rango_fechas = st.date_input(
     "Selecciona el rango de fechas:",
     value=(fecha_inicio_default, fecha_fin_default),
@@ -82,14 +78,20 @@ rango_fechas = st.date_input(
     max_value=fecha_fin_default
 )
 
-if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
+# Manejo robusto del input para rango de fechas
+if isinstance(rango_fechas, (tuple, list)) and len(rango_fechas) == 2:
     fecha_inicio, fecha_fin = rango_fechas
-    df_filtrado = df[(df["Fecha"] >= fecha_inicio) & (df["Fecha"] <= fecha_fin)].copy()
-    df_expandido_filtrado = df_expandido[(df_expandido["Fecha"] >= fecha_inicio) & (df_expandido["Fecha"] <= fecha_fin)].copy()
+elif isinstance(rango_fechas, (tuple, list)) and len(rango_fechas) == 1:
+    fecha_inicio = fecha_fin = rango_fechas[0]
+elif hasattr(rango_fechas, "date"):  # pd.Timestamp u objeto similar
+    fecha_inicio = fecha_fin = rango_fechas.date()
+elif isinstance(rango_fechas, str):
+    fecha_inicio = fecha_fin = pd.to_datetime(rango_fechas).date()
 else:
-    st.warning("Selecciona un rango de fechas válido.")
-    df_filtrado = df.copy()
-    df_expandido_filtrado = df_expandido.copy()
+    fecha_inicio, fecha_fin = fecha_inicio_default, fecha_fin_default
+
+df_filtrado = df[(df["Fecha"] >= fecha_inicio) & (df["Fecha"] <= fecha_fin)].copy()
+df_expandido_filtrado = df_expandido[(df_expandido["Fecha"] >= fecha_inicio) & (df_expandido["Fecha"] <= fecha_fin)].copy()
 
 # Tablas y agrupaciones
 detalle = df_expandido_filtrado.groupby(["AgenteFinal", "Fecha"]).agg(
@@ -187,21 +189,27 @@ with tab3:
 
 with tab4:
     st.header("📈 Productividad y Tasa de Abandono Diaria")
-    st.dataframe(df_productividad.style.format({"Productividad (%)": "{:.2f}", "Tasa de Abandono (%)": "{:.2f}"}))
+    st.dataframe(df_productividad[["Fecha", "LlamadasRecibidas", "LlamadasPerdidas", "Productividad (%)", "Tasa de Abandono (%)", "DíaSemana"]])
 
 with tab5:
-    st.header("📉 Heatmap de llamadas perdidas por hora y día")
-    fig2, ax2 = plt.subplots(figsize=(10, 6))
-    sns.heatmap(pivot_perdidas, cmap="Reds", annot=True, fmt="d", ax=ax2)
-    ax2.set_xlabel("Día de la Semana")
-    ax2.set_ylabel("Hora del Día")
-    st.pyplot(fig2)
+    st.header("📉 Llamadas Perdidas por Hora y Día")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(pivot_perdidas, cmap="OrRd", annot=True, fmt="d", ax=ax)
+    ax.set_xlabel("Día de la Semana")
+    ax.set_ylabel("Hora del Día")
+    st.pyplot(fig)
 
 with tab6:
-    st.header("⏳ Duración promedio de conversación por agente (minutos)")
-    st.bar_chart(talktime_por_agente["mean_minutes"])
+    st.header("⏱️ Duración promedio de llamadas (minutos) por agente")
+    st.dataframe(talktime_por_agente[["mean_minutes", "count"]].rename(columns={"mean_minutes": "Duración Promedio (min)","count": "Número de llamadas"}))
 
 with tab7:
-    st.header("🚨 Alertas de picos en llamadas")
-    st.sidebar  # Para mantener la alerta lateral
-
+    st.header("🚨 Alertas de Picos")
+    if not alertas_recibidas.empty:
+        st.write("🔺 Picos en llamadas recibidas:")
+        st.dataframe(alertas_recibidas)
+    if not alertas_perdidas.empty:
+        st.write("🔺 Picos en llamadas perdidas:")
+        st.dataframe(alertas_perdidas)
+    if alertas_recibidas.empty and alertas_perdidas.empty:
+        st.write("No hay alertas de picos en el rango seleccionado.")
