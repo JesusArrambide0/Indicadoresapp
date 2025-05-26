@@ -29,6 +29,14 @@ dias_traducidos = {
 }
 df["DíaSemana"] = df["DíaSemana_En"].map(dias_traducidos)
 
+# Asegurar que 'Fecha' sea datetime y sin nulos para evitar errores en st.date_input
+df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+df = df.dropna(subset=['Fecha'])
+fechas_disponibles = df['Fecha'].sort_values().unique()
+
+fecha_inicio_default = pd.to_datetime(fechas_disponibles[0]).date()
+fecha_fin_default = pd.to_datetime(fechas_disponibles[-1]).date()
+
 # Llamadas perdidas
 df["LlamadaPerdida"] = df["Talk Time"] == pd.Timedelta("0:00:00")
 
@@ -66,11 +74,7 @@ df_expandido = df_expandido[df_expandido["AgenteFinal"].notna()]
 # Título principal
 st.title("Análisis Integral de Productividad y Llamadas")
 
-# Corrección aquí: asegurar que las fechas sean datetime.date para st.date_input
-fechas_disponibles = pd.to_datetime(df["Fecha"]).sort_values().unique()
-fecha_inicio_default = pd.to_datetime(fechas_disponibles[0]).date()
-fecha_fin_default = pd.to_datetime(fechas_disponibles[-1]).date()
-
+# Filtro por fechas
 rango_fechas = st.date_input(
     "Selecciona el rango de fechas:",
     value=(fecha_inicio_default, fecha_fin_default),
@@ -183,30 +187,21 @@ with tab3:
 
 with tab4:
     st.header("📈 Productividad y Tasa de Abandono Diaria")
-    st.dataframe(df_productividad[["Fecha", "LlamadasRecibidas", "LlamadasPerdidas", "Productividad (%)", "Tasa de Abandono (%)", "DíaSemana"]])
+    st.dataframe(df_productividad.style.format({"Productividad (%)": "{:.2f}", "Tasa de Abandono (%)": "{:.2f}"}))
 
 with tab5:
-    st.header("📉 Llamadas Perdidas por Hora y Día")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.heatmap(pivot_perdidas, cmap="Reds", annot=True, fmt="d", ax=ax)
-    ax.set_xlabel("Día de la Semana")
-    ax.set_ylabel("Hora del Día")
-    st.pyplot(fig)
+    st.header("📉 Heatmap de llamadas perdidas por hora y día")
+    fig2, ax2 = plt.subplots(figsize=(10, 6))
+    sns.heatmap(pivot_perdidas, cmap="Reds", annot=True, fmt="d", ax=ax2)
+    ax2.set_xlabel("Día de la Semana")
+    ax2.set_ylabel("Hora del Día")
+    st.pyplot(fig2)
 
 with tab6:
-    st.header("⏱️ Promedio y Distribución del Talk Time")
-    st.dataframe(talktime_por_agente[["count", "mean_minutes"]].rename(columns={
-        "count": "Llamadas Atendidas", "mean_minutes": "Promedio (min)"
-    }).style.format({"Promedio (min)": "{:.2f}"}))
+    st.header("⏳ Duración promedio de conversación por agente (minutos)")
+    st.bar_chart(talktime_por_agente["mean_minutes"])
 
 with tab7:
-    st.header("🚨 Alertas de Picos")
-    if not alertas_recibidas.empty:
-        st.write("### Picos en llamadas recibidas:")
-        st.dataframe(alertas_recibidas)
-    if not alertas_perdidas.empty:
-        st.write("### Picos en llamadas perdidas:")
-        st.dataframe(alertas_perdidas)
-    if alertas_recibidas.empty and alertas_perdidas.empty:
-        st.write("No se detectaron picos inusuales.")
+    st.header("🚨 Alertas de picos en llamadas")
+    st.sidebar  # Para mantener la alerta lateral
 
