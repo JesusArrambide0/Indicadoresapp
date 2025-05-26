@@ -69,17 +69,13 @@ df_expandido = df_expandido[df_expandido["AgenteFinal"].notna()]
 st.title("Análisis Integral de Productividad y Llamadas")
 
 # Filtro por rango de fechas
-fecha_min = df["Call Start Time"].min().date()
-fecha_max = df["Call Start Time"].max().date()
+fecha_min = df["Fecha"].min()
+fecha_max = df["Fecha"].max()
 fecha_inicio, fecha_fin = st.date_input("Selecciona un rango de fechas:", [fecha_min, fecha_max])
 
-# Convertir fechas seleccionadas a datetime para comparación
-fecha_inicio = pd.to_datetime(fecha_inicio)
-fecha_fin = pd.to_datetime(fecha_fin)
-
-# Filtrar dataframes por rango de fecha y hora usando Call Start Time
-df_filtrado = df[(df["Call Start Time"] >= fecha_inicio) & (df["Call Start Time"] <= fecha_fin)]
-df_expandido_filtrado = df_expandido[(df_expandido["Call Start Time"] >= fecha_inicio) & (df_expandido["Call Start Time"] <= fecha_fin)]
+# Filtrar dataframes por fechas
+df_filtrado = df[(df["Fecha"] >= fecha_inicio) & (df["Fecha"] <= fecha_fin)]
+df_expandido_filtrado = df_expandido[(df_expandido["Fecha"] >= fecha_inicio) & (df_expandido["Fecha"] <= fecha_fin)]
 
 # Productividad general diaria
 df_productividad = df_filtrado.groupby(df_filtrado["Call Start Time"].dt.date).agg(
@@ -91,15 +87,16 @@ df_productividad["Productividad (%)"] = (
     (df_productividad["LlamadasRecibidas"] - df_productividad["LlamadasPerdidas"]) / df_productividad["LlamadasRecibidas"] * 100
 ).round(2)
 df_productividad["Tasa de Abandono (%)"] = 100 - df_productividad["Productividad (%)"]
-df_productividad["DíaSemana"] = pd.to_datetime(df_productividad["Call Start Time"]).dt.day_name().map(dias_traducidos)
+
+# Aquí está la corrección importante:
+df_productividad["DíaSemana"] = pd.to_datetime(df_productividad["Fecha"]).dt.day_name().map(dias_traducidos)
 
 # Detalle diario por programador
-detalle = df_expandido_filtrado.groupby(["AgenteFinal", df_expandido_filtrado["Call Start Time"].dt.date]).agg(
+detalle = df_expandido_filtrado.groupby(["AgenteFinal", "Fecha"]).agg(
     LlamadasTotales=("Talk Time", "count"),
     LlamadasPerdidas=("LlamadaPerdida", "sum"),
     TalkTimeTotal=("Talk Time", "sum")
-).reset_index().rename(columns={"Call Start Time": "Fecha"})
-
+).reset_index()
 detalle["LlamadasAtendidas"] = detalle["LlamadasTotales"] - detalle["LlamadasPerdidas"]
 detalle["Productividad (%)"] = (detalle["LlamadasAtendidas"] / detalle["LlamadasTotales"] * 100).round(2)
 detalle["Promedio Talk Time (seg)"] = (detalle["TalkTimeTotal"].dt.total_seconds() / detalle["LlamadasAtendidas"]).round(2)
@@ -189,6 +186,31 @@ with tab5:
         promedio_talktime = talktime_seconds.mean()
         st.write(f"Promedio de Talk Time para {agente_seleccionado}: **{promedio_talktime:.2f} segundos**")
     else:
-        st.write(f"No hay datos de llamadas atendidas para {agente_seleccionado} en el rango de fechas seleccionado.")
+        st.write(f"No hay llamadas atendidas para {agente_seleccionado} en el rango seleccionado.")
 
-# Fin del código
+    st.header("Alertas de picos o pérdidas de llamadas")
+
+    resumen_agente_hora = df_expandido_filtrado.groupby(["AgenteFinal", "Hora"]).agg(
+        TotalLlamadas=("Talk Time", "count"),
+        LlamadasPerdidas=("LlamadaPerdida", "sum")
+    ).reset_index()
+
+    alertas = []
+
+    for agente in resumen_agente_hora["AgenteFinal"].unique():
+        df_agente_hora = resumen_agente_hora[resumen_agente_hora["AgenteFinal"] == agente].sort_values("Hora")
+        for i in range(1, len(df_agente_hora) - 1):
+            llamadas_antes = df_agente_hora.iloc[i-1]["TotalLlamadas"]
+            llamadas_actual = df_agente_hora.iloc[i]["TotalLlamadas"]
+            llamadas_despues = df_agente_hora.iloc[i+1]["TotalLlamadas"]
+
+            # Detectar si el número de llamadas baja a 0 o muy bajo en la hora actual y luego vuelve a subir
+            if llamadas_antes >= 2 and llamadas_actual == 0 and llamadas_despues >= 2:
+                alertas.append(f"Alerta: En hora {df_agente_hora.iloc[i]['Hora']} el agente {agente} tuvo caída abrupta de llamadas.")
+
+    if alertas:
+        for alerta in alertas:
+            st.warning(alerta)
+    else:
+        st.success("No se detectaron alertas de picos o pérdidas inusuales.")
+
