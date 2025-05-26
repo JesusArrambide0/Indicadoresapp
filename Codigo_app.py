@@ -66,10 +66,10 @@ df_expandido = df_expandido[df_expandido["AgenteFinal"].notna()]
 # Título principal
 st.title("Análisis Integral de Productividad y Llamadas")
 
-# Filtro por fechas
-fechas_disponibles = df["Fecha"].sort_values().unique()
-fecha_inicio_default = fechas_disponibles[0]
-fecha_fin_default = fechas_disponibles[-1]
+# Corrección aquí: asegurar que las fechas sean datetime.date para st.date_input
+fechas_disponibles = pd.to_datetime(df["Fecha"]).sort_values().unique()
+fecha_inicio_default = pd.to_datetime(fechas_disponibles[0]).date()
+fecha_fin_default = pd.to_datetime(fechas_disponibles[-1]).date()
 
 rango_fechas = st.date_input(
     "Selecciona el rango de fechas:",
@@ -200,8 +200,13 @@ with tab6:
     }).style.format({"Promedio (min)": "{:.2f}"}))
 
 with tab7:
-    st.header("🚨 Fechas con Picos de Llamadas o Abandono")
-    st.write("**Llamadas recibidas mayores a 2 desviaciones estándar:**")
-    st.dataframe(alertas_recibidas)
-    st.write("**Llamadas perdidas mayores a 2 desviaciones estándar:**")
-    st.dataframe(alertas_perdidas)
+    st.header("🚨 Alertas de Picos")
+    if not alertas_recibidas.empty:
+        st.write("### Picos en llamadas recibidas:")
+        st.dataframe(alertas_recibidas)
+    if not alertas_perdidas.empty:
+        st.write("### Picos en llamadas perdidas:")
+        st.dataframe(alertas_perdidas)
+    if alertas_recibidas.empty and alertas_perdidas.empty:
+        st.write("No se detectaron picos inusuales.")
+
