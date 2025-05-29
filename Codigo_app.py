@@ -120,26 +120,30 @@ horas_ordenadas = list(range(8, 21))  # 8am a 20pm
 pivot_table = pivot_table.reindex(horas_ordenadas[::-1], fill_value=0)
 pivot_table.index = [f"{h}:00" for h in pivot_table.index]
 
-# Heatmap llamadas perdidas totales por hora y día
-pivot_perdidas = df_expandido_filtrado[df_expandido_filtrado["DíaSemana_En"].isin(dias_validos)]
-pivot_perdidas = pivot_perdidas[pivot_perdidas["LlamadaPerdida"]]
+# Preparación del pivot table para heatmap llamadas perdidas (reordenado y con índice legible)
+dias_validos = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+dias_traducidos = {
+    "Monday": "Lunes", "Tuesday": "Martes", "Wednesday": "Miércoles",
+    "Thursday": "Jueves", "Friday": "Viernes", "Saturday": "Sábado", "Sunday": "Domingo"
+}
+horas_ordenadas = list(range(8, 21))  # Desde 8am hasta 20pm
+
+pivot_perdidas = df_expandido_filtrado[
+    (df_expandido_filtrado["DíaSemana_En"].isin(dias_validos)) & (df_expandido_filtrado["LlamadaPerdida"])
+]
 
 pivot_table_perdidas = pivot_perdidas.pivot_table(
-    index="Hora", columns="DíaSemana_En", aggfunc="size", fill_value=0
+    index="Hora",
+    columns="DíaSemana_En",
+    aggfunc="size",
+    fill_value=0
 )
+
+# Reordenar columnas y filas
 pivot_table_perdidas = pivot_table_perdidas.reindex(columns=dias_validos, fill_value=0)
 pivot_table_perdidas.columns = [dias_traducidos[d] for d in pivot_table_perdidas.columns]
-pivot_table_perdidas = pivot_table_perdidas.sort_index(ascending=True)
-
-# Reordenar índice de horas para que inicie desde 8am hacia abajo
-pivot_table_perdidas = pivot_table_perdidas.reindex(horas_ordenadas[::-1], fill_value=0)
+pivot_table_perdidas = pivot_table_perdidas.reindex(horas_ordenadas[::-1], fill_value=0)  # invertir orden para mostrar de 8am hacia abajo
 pivot_table_perdidas.index = [f"{h}:00" for h in pivot_table_perdidas.index]
-
-
-# Invertir índice de horas para heatmap llamadas perdidas
-pivot_table_perdidas = pivot_table_perdidas.reindex(horas_ordenadas[::-1], fill_value=0)
-pivot_table_perdidas.index = [f"{h}:00" for h in pivot_table_perdidas.index]
-
 # Tabs para navegación
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Productividad General",
