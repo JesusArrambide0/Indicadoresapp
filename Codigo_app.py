@@ -128,8 +128,9 @@ dias_traducidos = {
 }
 horas_ordenadas = list(range(8, 21))  # Desde 8am hasta 20pm
 
-pivot_perdidas = df_expandido_filtrado[
-    (df_expandido_filtrado["DíaSemana_En"].isin(dias_validos)) & (df_expandido_filtrado["LlamadaPerdida"])
+# Preparación del pivot table para heatmap llamadas perdidas (sin duplicar por agente)
+pivot_perdidas = df_filtrado[
+    (df_filtrado["DíaSemana_En"].isin(dias_validos)) & (df_filtrado["LlamadaPerdida"])
 ]
 
 pivot_table_perdidas = pivot_perdidas.pivot_table(
