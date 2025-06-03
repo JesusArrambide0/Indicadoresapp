@@ -170,22 +170,23 @@ with tab1:
 
 with tab2:
     st.header("Detalle Diario por Programador")
-    agente_seleccionado_detalle = st.selectbox("Selecciona Programador", options=detalle["AgenteFinal"].unique(), key="detalle_agente")
-    df_agente = detalle[detalle["AgenteFinal"] == agente_seleccionado_detalle].sort_values("Fecha")
 
-    def color_fila(row):
+    def color_fila_tab2(row):
         valor = row["Productividad (%)"]
         if valor >= 95:
-            color = "background-color: #d4edda"  # verde claro
+            color = "background-color: #28a745; color: white;"  # verde brillante
         elif 90 <= valor < 95:
-            color = "background-color: #fff3cd"  # amarillo claro
+            color = "background-color: #fff3cd; color: black;"  # amarillo pastel tenue
         else:
-            color = "background-color: #f8d7da"  # rojo claro
+            color = "background-color: #dc3545; color: white;"  # rojo brillante
         return [color] * len(row)
 
+    agente_seleccionado_detalle = st.selectbox("Selecciona Programador", options=detalle["AgenteFinal"].unique(), key="detalle_agente")
+    df_agente = detalle[detalle["AgenteFinal"] == agente_seleccionado_detalle].sort_values("Fecha")
+    
     st.dataframe(
         df_agente.style
-            .apply(color_fila, axis=1)
+            .apply(color_fila_tab2, axis=1)
             .format({"Productividad (%)": "{:.2f}", "Promedio Talk Time (seg)": "{:.2f}"})
     )
 
