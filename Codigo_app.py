@@ -214,53 +214,46 @@ with tab4:
     st.pyplot(plt.gcf())
 
 with tab5:
-    st.header("Distribución y Promedio del Tiempo de Conversación por Agente")
-    agente_seleccionado = st.selectbox("Selecciona un agente para ver distribución de Talk Time:", options=df_expandido_filtrado["AgenteFinal"].unique())
-    df_agente_talktime = df_expandido_filtrado[(df_expandido_filtrado["AgenteFinal"] == agente_seleccionado) & (~df_expandido_filtrado["LlamadaPerdida"])]
+    st.header("Análisis detallado por Agente")
 
-    if not df_agente_talktime.empty:
+    agente_seleccionado = st.selectbox("Selecciona Agente", options=df_expandido_filtrado["AgenteFinal"].unique(), key="tab5_agente")
+
+    df_agente_talktime = df_expandido_filtrado[
+        (df_expandido_filtrado["AgenteFinal"] == agente_seleccionado) & (~df_expandido_filtrado["LlamadaPerdida"])
+    ]
+
+    if not df_agente_talktime.empty and df_agente_talktime["Talk Time"].notna().any():
         talktime_seconds = df_agente_talktime["Talk Time"].dt.total_seconds()
-        fig_hist, ax_hist = plt.subplots()
-        ax_hist.hist(talktime_seconds, bins=30, color='skyblue', edgecolor='black')
-        ax_hist.set_title(f"Distribución de Talk Time (segundos) - {agente_seleccionado}")
-        ax_hist.set_xlabel("Segundos")
-        ax_hist.set_ylabel("Frecuencia")
-        st.pyplot(fig_hist)
+
+        fig_hist_talk, ax_hist_talk = plt.subplots()
+        ax_hist_talk.hist(talktime_seconds, bins=30, color='skyblue', edgecolor='black')
+        ax_hist_talk.set_title(f"Distribución de Talk Time (segundos) - {agente_seleccionado}")
+        ax_hist_talk.set_xlabel("Segundos")
+        ax_hist_talk.set_ylabel("Frecuencia")
+        st.pyplot(fig_hist_talk)
 
         promedio_talktime = talktime_seconds.mean()
         st.write(f"Promedio de Talk Time para {agente_seleccionado}: **{promedio_talktime:.2f} segundos**")
     else:
-        st.write(f"No hay llamadas atendidas para {agente_seleccionado} en el rango seleccionado.")
+        st.write(f"No hay datos de Talk Time para {agente_seleccionado} en el rango seleccionado.")
 
-    st.header("Alertas de picos o pérdidas de llamadas")
+    # ===== INICIO ANÁLISIS RING TIME =====
+    st.header(f"Distribución y Promedio del Ring Time por Agente")
+    df_agente_ringtime = df_expandido_filtrado[
+        (df_expandido_filtrado["AgenteFinal"] == agente_seleccionado) & (~df_expandido_filtrado["LlamadaPerdida"])
+    ]
 
-    resumen_agente_hora = df_expandido_filtrado.groupby(["AgenteFinal", "Hora"]).agg(
-        TotalLlamadas=("Talk Time", "count"),
-        LlamadasPerdidas=("LlamadaPerdida", "sum")
-    ).reset_index()
+    if not df_agente_ringtime.empty and df_agente_ringtime["Ring Time"].notna().any():
+        ringtime_seconds = df_agente_ringtime["Ring Time"].dt.total_seconds()
+        fig_hist_ring, ax_hist_ring = plt.subplots()
+        ax_hist_ring.hist(ringtime_seconds, bins=30, color='lightcoral', edgecolor='black')
+        ax_hist_ring.set_title(f"Distribución de Ring Time (segundos) - {agente_seleccionado}")
+        ax_hist_ring.set_xlabel("Segundos")
+        ax_hist_ring.set_ylabel("Frecuencia")
+        st.pyplot(fig_hist_ring)
 
-    alertas = []
-
-    for agente in resumen_agente_hora["AgenteFinal"].unique():
-        data_agente = resumen_agente_hora[resumen_agente_hora["AgenteFinal"] == agente]
-
-        mean_total = data_agente["TotalLlamadas"].mean()
-        std_total = data_agente["TotalLlamadas"].std()
-        umbral_total = mean_total + 2 * std_total
-
-        for _, row in data_agente.iterrows():
-            if row["TotalLlamadas"] > umbral_total:
-                alertas.append(f"Alerta: {agente} tuvo un pico de llamadas ({row['TotalLlamadas']}) a la hora {row['Hora']}:00")
-
-        # Verificar si hubo hora sin llamadas entre horas con llamadas
-        horas_con_llamadas = sorted(data_agente[data_agente["TotalLlamadas"] > 0]["Hora"].unique())
-        for i in range(len(horas_con_llamadas) - 1):
-            if horas_con_llamadas[i+1] - horas_con_llamadas[i] > 1:
-                faltante = horas_con_llamadas[i] + 1
-                alertas.append(f"Alerta: {agente} no tuvo llamadas a la hora {faltante}:00 entre horas con actividad.")
-
-    if alertas:
-        for alerta in alertas:
-            st.warning(alerta)
+        promedio_ringtime = ringtime_seconds.mean()
+        st.write(f"Promedio de Ring Time para {agente_seleccionado}: **{promedio_ringtime:.2f} segundos**")
     else:
-        st.success("No se detectaron alertas de picos o pérdidas de llamadas.")
+        st.write(f"No hay datos de Ring Time para {agente_seleccionado} en el rango seleccionado.")
+    # ===== FIN ANÁLISIS RING TIME =====
