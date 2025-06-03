@@ -181,11 +181,11 @@ with tab2:
     def color_fila_detalle(row):
         valor = row["Productividad (%)"]
         if valor >= 97:
-            color = "background-color: lightgreen"
+            color = "background-color: #28a745; color: white;"  # verde brillante
         elif 90 <= valor < 97:
-            color = "background-color: khaki"
+            color = "background-color: #fff3cd; color: black;"  # amarillo pastel tenue
         else:
-            color = "background-color: salmon"
+            color = "background-color: #dc3545; color: white;"  # rojo brillante
         return [color] * len(row)
 
     detalle_tabla = detalle_agente[["Fecha", "LlamadasTotales", "LlamadasPerdidas", "LlamadasAtendidas", "Productividad (%)", "Promedio Talk Time (seg)"]]
