@@ -156,7 +156,7 @@ with tab1:
         if valor >= 97:
             color = "background-color: #28a745; color: white;"  # verde brillante
         elif 90 <= valor < 97:
-            color = "background-color: #ffc107; color: black;"  # amarillo brillante
+            color = "background-color: #fff3cd; color: black;"  # amarillo pastel tenue
         else:
             color = "background-color: #dc3545; color: white;"  # rojo brillante
         return [color] * len(row)
