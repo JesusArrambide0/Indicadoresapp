@@ -150,7 +150,23 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 
 with tab1:
     st.header("Productividad y Tasa de Abandono Diaria")
-    st.dataframe(df_productividad[["Fecha", "LlamadasRecibidas", "LlamadasPerdidas", "Productividad (%)", "Tasa de Abandono (%)", "DíaSemana"]])
+
+    def color_fila_tab1(row):
+        valor = row["Productividad (%)"]
+        if valor >= 97:
+            color = "background-color: #d4edda"  # verde claro
+        elif 90 <= valor < 97:
+            color = "background-color: #fff3cd"  # amarillo claro
+        else:
+            color = "background-color: #f8d7da"  # rojo claro
+        return [color] * len(row)
+
+    st.dataframe(
+        df_productividad[["Fecha", "LlamadasRecibidas", "LlamadasPerdidas", "Productividad (%)", "Tasa de Abandono (%)", "DíaSemana"]]
+            .style
+            .apply(color_fila_tab1, axis=1)
+            .format({"Productividad (%)": "{:.2f}", "Tasa de Abandono (%)": "{:.2f}"})
+    )
 
 with tab2:
     st.header("Detalle Diario por Programador")
