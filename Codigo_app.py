@@ -227,15 +227,14 @@ with tab5:
             if horas_con_llamadas[i+1] - horas_con_llamadas[i] > 1:
                 faltante = horas_con_llamadas[i] + 1
                 alertas.append(f"Alerta: {agente} no tuvo llamadas a la hora {faltante}:00 entre horas con actividad.")
-if alertas:
-    agentes_con_alertas = sorted(set(a.split()[1] for a in alertas))  # Extrae nombres de agentes
-
-    for agente in agentes_con_alertas:
-        alertas_agente = [a for a in alertas if a.startswith(f"Alerta: {agente}")]
-        if alertas_agente:
-            st.subheader(f"🔔 Alertas para {agente}")
-            for alerta in alertas_agente:
-                st.warning(alerta)
-else:
-    st.success("No se detectaron alertas de picos o pérdidas de llamadas.")
+                if alertas:
+                    agentes_con_alertas = sorted(set(a.split()[1] for a in alertas))  # Extrae nombres de agentes
+                    for agente in agentes_con_alertas:
+                        alertas_agente = [a for a in alertas if a.startswith(f"Alerta: {agente}")]
+                        if alertas_agente:
+                            st.subheader(f"🔔 Alertas para {agente}")
+                            for alerta in alertas_agente:
+                                st.warning(alerta)
+                        else:
+                            st.success("No se detectaron alertas de picos o pérdidas de llamadas.")
     
