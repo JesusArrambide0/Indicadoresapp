@@ -177,25 +177,26 @@ with tab2:
     st.header("Detalle Diario por Programador")
     agente_seleccionado = st.selectbox("Selecciona Programador:", detalle["AgenteFinal"].unique())
     detalle_agente = detalle[detalle["AgenteFinal"] == agente_seleccionado].sort_values("Fecha")
-    
-    def color_celda_detalle(val):
-        if val >= 97:
+
+    def color_fila_detalle(row):
+        valor = row["Productividad (%)"]
+        if valor >= 97:
             color = "background-color: lightgreen"
-        elif 90 <= val < 97:
+        elif 90 <= valor < 97:
             color = "background-color: khaki"
         else:
             color = "background-color: salmon"
-        return color
-    
-    detalle_tabla = detalle_agente[["Fecha", "LlamadasTotales", "LlamadasPerdidas", "LlamadasAtendidas", "Productividad (%)", "Promedio Talk Time (seg)"]].copy()
-    detalle_tabla = detalle_tabla.style.applymap(lambda v: "background-color: lightgreen" if v >= 97 else "", subset=["Productividad (%)"])
-    st.dataframe(detalle_tabla)
-    
+        return [color] * len(row)
+
+    detalle_tabla = detalle_agente[["Fecha", "LlamadasTotales", "LlamadasPerdidas", "LlamadasAtendidas", "Productividad (%)", "Promedio Talk Time (seg)"]]
+    styled_detalle = detalle_tabla.style.apply(color_fila_detalle, axis=1).format({"Productividad (%)": "{:.2f}", "Promedio Talk Time (seg)": "{:.2f}"})
+    st.dataframe(styled_detalle)
+
     # Agregar recuadro de cumplimiento para este programador
     dias_cumplen_prog = detalle_agente[detalle_agente["Productividad (%)"] >= 97].shape[0]
     total_dias_prog = detalle_agente.shape[0]
     porcentaje_cumplen_prog = (dias_cumplen_prog / total_dias_prog * 100) if total_dias_prog > 0 else 0
-    
+
     st.markdown(f"### Cumplimiento de Meta para {agente_seleccionado}")
     st.markdown(f"- **Días que cumplen meta (≥97% Productividad):** {dias_cumplen_prog} días")
     st.markdown(f"- **Porcentaje de cumplimiento:** {porcentaje_cumplen_prog:.2f} %")
