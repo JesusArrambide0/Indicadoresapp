@@ -149,10 +149,10 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 with tab1:
-    st.header("Detalle Diario por Programador")
+    st.header("Productividad y Tasa de Abandono Diaria")
 
     def color_fila_tab1(row):
-        valor = row["Productividad"]
+        valor = row["Productividad (%)"]
         if valor >= 97:
             color = "background-color: #28a745; color: white;"  # verde brillante
         elif 90 <= valor < 97:
@@ -162,30 +162,17 @@ with tab1:
         return [color] * len(row)
 
     st.dataframe(
-        detalle_normalizado.style
+        df_productividad[["Fecha", "LlamadasRecibidas", "LlamadasPerdidas", "Productividad (%)", "Tasa de Abandono (%)", "DíaSemana"]]
+            .style
             .apply(color_fila_tab1, axis=1)
-            .format({"Productividad": "{:.2f}", "Talk Time": "{:.2f}"})
+            .format({"Productividad (%)": "{:.2f}", "Tasa de Abandono (%)": "{:.2f}"})
     )
 
-    # Cuadro de cumplimiento diario
-    total_dias = len(detalle_normalizado)
-    dias_cumplen = (detalle_normalizado["Productividad"] >= 97).sum()
-    porcentaje_cumplen = (dias_cumplen / total_dias) * 100 if total_dias > 0 else 0
-
-    mensaje = f"Cumplimiento: {dias_cumplen} de {total_dias} días ({porcentaje_cumplen:.1f}%) con productividad ≥ 97%"
-
-    if porcentaje_cumplen >= 95:
-        st.success("✅ " + mensaje)
-    elif porcentaje_cumplen >= 70:
-        st.warning("⚠️ " + mensaje)
-    else:
-        st.error("❌ " + mensaje)
-
 with tab2:
-    st.header("Resumen General por Programador")
+    st.header("Detalle Diario por Programador")
 
     def color_fila_tab2(row):
-        valor = row["Productividad"]
+        valor = row["Productividad (%)"]
         if valor >= 95:
             color = "background-color: #28a745; color: white;"  # verde brillante
         elif 90 <= valor < 95:
@@ -194,26 +181,14 @@ with tab2:
             color = "background-color: #dc3545; color: white;"  # rojo brillante
         return [color] * len(row)
 
+    agente_seleccionado_detalle = st.selectbox("Selecciona Programador", options=detalle["AgenteFinal"].unique(), key="detalle_agente")
+    df_agente = detalle[detalle["AgenteFinal"] == agente_seleccionado_detalle].sort_values("Fecha")
+    
     st.dataframe(
-        resumen2.style
+        df_agente.style
             .apply(color_fila_tab2, axis=1)
-            .format({"Productividad": "{:.2f}", "Promedio Talk Time": "{:.2f}"})
+            .format({"Productividad (%)": "{:.2f}", "Promedio Talk Time (seg)": "{:.2f}"})
     )
-
-    # Cálculo de cumplimiento general
-    total_programadores = len(resumen2)
-    programadores_cumplen = (resumen2["Productividad"] >= 95).sum()
-    porcentaje_cumplen = (programadores_cumplen / total_programadores) * 100 if total_programadores > 0 else 0
-
-    # Mensaje con color dinámico
-    mensaje = f"Cumplimiento: {programadores_cumplen} de {total_programadores} programadores ({porcentaje_cumplen:.1f}%) con productividad ≥ 95%"
-
-    if porcentaje_cumplen >= 95:
-        st.success("✅ " + mensaje)
-    elif porcentaje_cumplen >= 70:
-        st.warning("⚠️ " + mensaje)
-    else:
-        st.error("❌ " + mensaje)
 
 with tab3:
     st.header("Distribución de llamadas por hora y día")
