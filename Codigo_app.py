@@ -196,8 +196,17 @@ with tab5:
         ax_hist.set_ylabel("Frecuencia")
         st.pyplot(fig_hist)
 
-        promedio_talktime = talktime_seconds.mean()
+                promedio_talktime = talktime_seconds.mean()
         st.write(f"Promedio de Talk Time para {agente_seleccionado}: **{promedio_talktime:.2f} segundos**")
+
+        # Calcular promedio de Ring Time
+        if "Ring Time" in df_agente_talktime.columns:
+            df_agente_talktime["Ring Time"] = pd.to_timedelta(df_agente_talktime["Ring Time"], errors="coerce")
+            promedio_ringtime = df_agente_talktime["Ring Time"].dt.total_seconds().mean()
+            st.write(f"Promedio de Ring Time para {agente_seleccionado}: **{promedio_ringtime:.2f} segundos**")
+        else:
+            st.warning("No se encontró la columna 'Ring Time' en el archivo.")
+
     else:
         st.write(f"No hay llamadas atendidas para {agente_seleccionado} en el rango seleccionado.")
 
