@@ -3,4 +3,4 @@ pandas
 matplotlib
 seaborn
 openpyxl
-ploty
+plotly
