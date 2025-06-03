@@ -154,11 +154,11 @@ with tab1:
     def color_fila_tab1(row):
         valor = row["Productividad (%)"]
         if valor >= 97:
-            color = "background-color: #d4edda"  # verde claro
+            color = "background-color: #28a745; color: white;"  # verde brillante
         elif 90 <= valor < 97:
-            color = "background-color: #fff3cd"  # amarillo claro
+            color = "background-color: #ffc107; color: black;"  # amarillo brillante
         else:
-            color = "background-color: #f8d7da"  # rojo claro
+            color = "background-color: #dc3545; color: white;"  # rojo brillante
         return [color] * len(row)
 
     st.dataframe(
