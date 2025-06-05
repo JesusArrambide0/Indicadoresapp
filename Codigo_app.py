@@ -203,18 +203,6 @@ with tab2:
         st.markdown("---")
     st.subheader("📊 Promedio de Productividad por Agente (Fechas Filtradas)")
 
-    promedio_productividad = (
-        detalle.groupby("AgenteFinal")["Productividad (%)"]
-        .mean()
-        .round(2)
-        .sort_values(ascending=False)
-    )
-
-    st.dataframe(
-        promedio_productividad.reset_index().rename(columns={"Productividad (%)": "Promedio Productividad (%)"}),
-        use_container_width=True
-    )
-
 with tab3:
     st.header("Heatmap de Llamadas Entrantes")
     plt.figure(figsize=(10, 6))
