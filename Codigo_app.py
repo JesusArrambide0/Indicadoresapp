@@ -116,24 +116,21 @@ pivot_table = pivot_table.reindex(columns=dias_validos, fill_value=0)
 pivot_table.columns = [dias_traducidos[d] for d in pivot_table.columns]
 pivot_table = pivot_table.sort_index(ascending=True)
 
-# Invertir índice de horas para empezar desde 8am hacia abajo
-horas_ordenadas = list(range(8, 21))  # 8am a 20pm
+# Invertir índice de horas
+horas_ordenadas = list(range(8, 21))
 pivot_table = pivot_table.reindex(horas_ordenadas[::-1], fill_value=0)
 pivot_table.index = [f"{h}:00" for h in pivot_table.index]
 
-# Preparación del pivot table para heatmap llamadas perdidas (reordenado y con índice legible)
+# Heatmap llamadas perdidas
 pivot_perdidas = df_expandido_filtrado[
     (df_expandido_filtrado["DíaSemana_En"].isin(dias_validos)) & (df_expandido_filtrado["LlamadaPerdida"])
 ]
-
 pivot_table_perdidas = pivot_perdidas.pivot_table(
     index="Hora",
     columns="DíaSemana_En",
     aggfunc="size",
     fill_value=0
 )
-
-# Reordenar columnas y filas
 pivot_table_perdidas = pivot_table_perdidas.reindex(columns=dias_validos, fill_value=0)
 pivot_table_perdidas.columns = [dias_traducidos[d] for d in pivot_table_perdidas.columns]
 pivot_table_perdidas = pivot_table_perdidas.reindex(horas_ordenadas[::-1], fill_value=0)
@@ -154,17 +151,16 @@ with tab1:
     def color_fila_tab1(row):
         valor = row["Productividad (%)"]
         if valor >= 97:
-            color = "background-color: #28a745; color: white;"  # verde brillante
+            color = "background-color: #28a745; color: white;"
         elif 90 <= valor < 97:
-            color = "background-color: #fff3cd; color: black;"  # amarillo pastel tenue
+            color = "background-color: #fff3cd; color: black;"
         else:
-            color = "background-color: #dc3545; color: white;"  # rojo brillante
+            color = "background-color: #dc3545; color: white;"
         return [color] * len(row)
 
     styled_df = df_productividad[["Fecha", "LlamadasRecibidas", "LlamadasPerdidas", "Productividad (%)", "Tasa de Abandono (%)", "DíaSemana"]].style.apply(color_fila_tab1, axis=1).format({"Productividad (%)": "{:.2f}", "Tasa de Abandono (%)": "{:.2f}"})
     st.dataframe(styled_df)
 
-    # Cálculo y muestra de cumplimiento (días verdes)
     dias_cumplen = df_productividad[df_productividad["Productividad (%)"] >= 97].shape[0]
     total_dias = df_productividad.shape[0]
     porcentaje_cumplen = (dias_cumplen / total_dias * 100) if total_dias > 0 else 0
@@ -181,18 +177,17 @@ with tab2:
     def color_fila_detalle(row):
         valor = row["Productividad (%)"]
         if valor >= 97:
-            color = "background-color: #28a745; color: white;"  # verde brillante
+            color = "background-color: #28a745; color: white;"
         elif 90 <= valor < 97:
-            color = "background-color: #fff3cd; color: black;"  # amarillo pastel tenue
+            color = "background-color: #fff3cd; color: black;"
         else:
-            color = "background-color: #dc3545; color: white;"  # rojo brillante
+            color = "background-color: #dc3545; color: white;"
         return [color] * len(row)
 
     detalle_tabla = detalle_agente[["Fecha", "LlamadasTotales", "LlamadasPerdidas", "LlamadasAtendidas", "Productividad (%)", "Promedio Talk Time (seg)"]]
     styled_detalle = detalle_tabla.style.apply(color_fila_detalle, axis=1).format({"Productividad (%)": "{:.2f}", "Promedio Talk Time (seg)": "{:.2f}"})
     st.dataframe(styled_detalle)
 
-    # Agregar recuadro de cumplimiento para este programador
     dias_cumplen_prog = detalle_agente[detalle_agente["Productividad (%)"] >= 97].shape[0]
     total_dias_prog = detalle_agente.shape[0]
     porcentaje_cumplen_prog = (dias_cumplen_prog / total_dias_prog * 100) if total_dias_prog > 0 else 0
@@ -200,8 +195,19 @@ with tab2:
     st.markdown(f"### Cumplimiento de Meta para {agente_seleccionado}")
     st.markdown(f"- **Días que cumplen meta (≥97% Productividad):** {dias_cumplen_prog} días")
     st.markdown(f"- **Porcentaje de cumplimiento:** {porcentaje_cumplen_prog:.2f} %")
-        st.markdown("---")
+
+    st.markdown("---")
     st.subheader("📊 Promedio de Productividad por Agente (Fechas Filtradas)")
+    promedio_productividad = (
+        detalle.groupby("AgenteFinal")["Productividad (%)"]
+        .mean()
+        .round(2)
+        .sort_values(ascending=False)
+    )
+    st.dataframe(
+        promedio_productividad.reset_index().rename(columns={"Productividad (%)": "Promedio Productividad (%)"}),
+        use_container_width=True
+    )
 
 with tab3:
     st.header("Heatmap de Llamadas Entrantes")
@@ -237,25 +243,4 @@ with tab5:
         promedio_talktime = talktime_seconds.mean()
         st.write(f"Promedio de Talk Time para {agente_seleccionado}: **{promedio_talktime:.2f} segundos**")
     else:
-        st.write(f"No hay datos de Talk Time para {agente_seleccionado} en el rango seleccionado.")
-
-    # ===== INICIO ANÁLISIS RING TIME =====
-    st.header(f"Distribución y Promedio del Ring Time por Agente")
-    df_agente_ringtime = df_expandido_filtrado[
-        (df_expandido_filtrado["AgenteFinal"] == agente_seleccionado) & (~df_expandido_filtrado["LlamadaPerdida"])
-    ]
-
-    if not df_agente_ringtime.empty and df_agente_ringtime["Ring Time"].notna().any():
-        ringtime_seconds = df_agente_ringtime["Ring Time"].dt.total_seconds()
-        fig_hist_ring, ax_hist_ring = plt.subplots()
-        ax_hist_ring.hist(ringtime_seconds, bins=30, color='lightcoral', edgecolor='black')
-        ax_hist_ring.set_title(f"Distribución de Ring Time (segundos) - {agente_seleccionado}")
-        ax_hist_ring.set_xlabel("Segundos")
-        ax_hist_ring.set_ylabel("Frecuencia")
-        st.pyplot(fig_hist_ring)
-
-        promedio_ringtime = ringtime_seconds.mean()
-        st.write(f"Promedio de Ring Time para {agente_seleccionado}: **{promedio_ringtime:.2f} segundos**")
-    else:
-        st.write(f"No hay datos de Ring Time para {agente_seleccionado} en el rango seleccionado.")
-    # ===== FIN ANÁLISIS RING TIME =====
+        st.write(f"No hay datos de Talk Time para {agente_seleccionado} en el período seleccionado.")
