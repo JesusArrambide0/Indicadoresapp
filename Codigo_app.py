@@ -200,6 +200,20 @@ with tab2:
     st.markdown(f"### Cumplimiento de Meta para {agente_seleccionado}")
     st.markdown(f"- **Días que cumplen meta (≥97% Productividad):** {dias_cumplen_prog} días")
     st.markdown(f"- **Porcentaje de cumplimiento:** {porcentaje_cumplen_prog:.2f} %")
+        st.markdown("---")
+    st.subheader("📊 Promedio de Productividad por Agente (Fechas Filtradas)")
+
+    promedio_productividad = (
+        detalle.groupby("AgenteFinal")["Productividad (%)"]
+        .mean()
+        .round(2)
+        .sort_values(ascending=False)
+    )
+
+    st.dataframe(
+        promedio_productividad.reset_index().rename(columns={"Productividad (%)": "Promedio Productividad (%)"}),
+        use_container_width=True
+    )
 
 with tab3:
     st.header("Heatmap de Llamadas Entrantes")
