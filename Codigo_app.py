@@ -244,3 +244,23 @@ with tab5:
         st.write(f"Promedio de Talk Time para {agente_seleccionado}: **{promedio_talktime:.2f} segundos**")
     else:
         st.write(f"No hay datos de Talk Time para {agente_seleccionado} en el período seleccionado.")
+   # ===== INICIO ANÁLISIS RING TIME =====
+    st.header(f"Distribución y Promedio del Ring Time por Agente")
+    df_agente_ringtime = df_expandido_filtrado[
+        (df_expandido_filtrado["AgenteFinal"] == agente_seleccionado) & (~df_expandido_filtrado["LlamadaPerdida"])
+    ]
+
+    if not df_agente_ringtime.empty and df_agente_ringtime["Ring Time"].notna().any():
+        ringtime_seconds = df_agente_ringtime["Ring Time"].dt.total_seconds()
+        fig_hist_ring, ax_hist_ring = plt.subplots()
+        ax_hist_ring.hist(ringtime_seconds, bins=30, color='lightcoral', edgecolor='black')
+        ax_hist_ring.set_title(f"Distribución de Ring Time (segundos) - {agente_seleccionado}")
+        ax_hist_ring.set_xlabel("Segundos")
+        ax_hist_ring.set_ylabel("Frecuencia")
+        st.pyplot(fig_hist_ring)
+
+        promedio_ringtime = ringtime_seconds.mean()
+        st.write(f"Promedio de Ring Time para {agente_seleccionado}: **{promedio_ringtime:.2f} segundos**")
+    else:
+        st.write(f"No hay datos de Ring Time para {agente_seleccionado} en el rango seleccionado.")
+    # ===== FIN ANÁLISIS RING TIME =====
