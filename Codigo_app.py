@@ -122,16 +122,11 @@ horas_ordenadas = list(range(8, 21))
 pivot_table = pivot_table.reindex(horas_ordenadas[::-1], fill_value=0)
 pivot_table.index = [f"{h}:00" for h in pivot_table.index]
 
-# Heatmap llamadas perdidas - SOLO LLAMADAS ÚNICAS
-pivot_perdidas_df = df_expandido_filtrado[
+# Heatmap llamadas perdidas
+pivot_perdidas = df_expandido_filtrado[
     (df_expandido_filtrado["DíaSemana_En"].isin(dias_validos)) & (df_expandido_filtrado["LlamadaPerdida"])
 ]
-
-# Aquí eliminamos duplicados para contar solo llamadas únicas:
-# Asumiendo que 'Call Start Time' y 'AgenteFinal' definen unicidad
-pivot_perdidas_df_unique = pivot_perdidas_df.drop_duplicates(subset=["Call Start Time", "AgenteFinal"])
-
-pivot_table_perdidas = pivot_perdidas_df_unique.pivot_table(
+pivot_table_perdidas = pivot_perdidas.pivot_table(
     index="Hora",
     columns="DíaSemana_En",
     aggfunc="size",
@@ -164,44 +159,84 @@ with tab1:
             color = "background-color: #dc3545; color: white;"
         return [color] * len(row)
 
-    styled_df = df_productividad[["Fecha", "LlamadasRecibidas", "LlamadasPerdidas", "Productividad (%)", "Tasa de Abandono (%)", "DíaSemana"]].style.apply(color_fila_tab1, axis=1)
-    st.dataframe(styled_df, use_container_width=True)
+    styled_df = df_productividad[["Fecha", "LlamadasRecibidas", "LlamadasPerdidas", "Productividad (%)", "Tasa de Abandono (%)", "DíaSemana"]].style.apply(color_fila_tab1, axis=1).format({"Productividad (%)": "{:.2f}", "Tasa de Abandono (%)": "{:.2f}"})
+    st.dataframe(styled_df)
+
+    dias_cumplen = df_productividad[df_productividad["Productividad (%)"] >= 97].shape[0]
+    total_dias = df_productividad.shape[0]
+    porcentaje_cumplen = (dias_cumplen / total_dias * 100) if total_dias > 0 else 0
+
+    st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
+
+    # Gráfico líneas productividad
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.lineplot(data=df_productividad, x="Fecha", y="Productividad (%)", marker="o", ax=ax)
+    ax.axhline(97, color="green", linestyle="--", label="Meta 97%")
+    ax.axhline(90, color="orange", linestyle="--", label="Alerta 90%")
+    ax.set_ylim(0, 105)
+    ax.set_ylabel("Productividad (%)")
+    ax.set_title("Productividad diaria")
+    ax.legend()
+    st.pyplot(fig)
 
 with tab2:
     st.header("Detalle Diario por Programador")
-    st.dataframe(detalle, use_container_width=True)
+
+    def color_fila_tab2(row):
+        valor = row["Productividad (%)"]
+        if valor >= 97:
+            color = "background-color: #28a745; color: white;"
+        elif 90 <= valor < 97:
+            color = "background-color: #fff3cd; color: black;"
+        else:
+            color = "background-color: #dc3545; color: white;"
+        return [color] * len(row)
+
+    styled_detalle = detalle[["AgenteFinal", "Fecha", "LlamadasTotales", "LlamadasPerdidas", "LlamadasAtendidas", "Productividad (%)", "Promedio Talk Time (seg)"]].style.apply(color_fila_tab2, axis=1).format({"Productividad (%)": "{:.2f}", "Promedio Talk Time (seg)": "{:.2f}"})
+    st.dataframe(styled_detalle)
+
+    agentes_seleccionados = st.multiselect("Selecciona programadores para ver gráfica:", options=detalle["AgenteFinal"].unique(), default=detalle["AgenteFinal"].unique())
+
+    if agentes_seleccionados:
+        fig2, ax2 = plt.subplots(figsize=(10, 4))
+        for agente in agentes_seleccionados:
+            df_plot = detalle[detalle["AgenteFinal"] == agente]
+            ax2.plot(df_plot["Fecha"], df_plot["Productividad (%)"], marker="o", label=agente)
+        ax2.axhline(97, color="green", linestyle="--", label="Meta 97%")
+        ax2.axhline(90, color="orange", linestyle="--", label="Alerta 90%")
+        ax2.set_ylim(0, 105)
+        ax2.set_ylabel("Productividad (%)")
+        ax2.set_title("Productividad diaria por programador")
+        ax2.legend()
+        st.pyplot(fig2)
 
 with tab3:
-    st.header("Heatmap de Llamadas Entrantes")
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.heatmap(pivot_table, cmap="viridis", annot=True, fmt="d", ax=ax)
-    ax.invert_yaxis()
-    ax.set_title("Llamadas entrantes por hora y día")
-    st.pyplot(fig)
+    st.header("Heatmap Llamadas Entrantes (Horas vs Día)")
+
+    fig3, ax3 = plt.subplots(figsize=(12, 6))
+    sns.heatmap(pivot_table, annot=True, fmt="d", cmap="YlGnBu", ax=ax3)
+    ax3.set_xlabel("Día de la semana")
+    ax3.set_ylabel("Hora del día")
+    st.pyplot(fig3)
 
 with tab4:
-    st.header("Heatmap de Llamadas Perdidas (solo llamadas únicas)")
-    fig2, ax2 = plt.subplots(figsize=(12, 6))
-    sns.heatmap(pivot_table_perdidas, cmap="rocket_r", annot=True, fmt="d", ax=ax2)
-    ax2.invert_yaxis()
-    ax2.set_title("Llamadas perdidas únicas por hora y día")
-    st.pyplot(fig2)
+    st.header("Heatmap Llamadas Perdidas (Horas vs Día)")
+
+    fig4, ax4 = plt.subplots(figsize=(12, 6))
+    sns.heatmap(pivot_table_perdidas, annot=True, fmt="d", cmap="YlOrRd", ax=ax4)
+    ax4.set_xlabel("Día de la semana")
+    ax4.set_ylabel("Hora del día")
+    st.pyplot(fig4)
 
 with tab5:
-    st.header("Distribución y Alertas")
-    st.write("Implementa tus gráficos o análisis adicionales aquí.")
+    st.header("Distribución de Duración de Llamadas y Alertas")
+
     st.subheader("Distribución de 'Talk Time' por agente")
     agentes_dist = st.multiselect("Selecciona agentes para distribución:", options=df_filtrado["Agent Name"].unique(), default=df_filtrado["Agent Name"].unique())
 
     df_dist_filtrado = df_filtrado[df_filtrado["Agent Name"].isin(agentes_dist) & (df_filtrado["Talk Time"] > pd.Timedelta(0))]
 
     if not df_dist_filtrado.empty:
-        # Mostrar tiempo promedio Talk Time por agente
-        promedio_talk = df_dist_filtrado.groupby("Agent Name")["Talk Time"].mean()
-        promedio_talk_min = promedio_talk.dt.total_seconds() / 60
-        st.markdown("### Tiempo promedio de 'Talk Time' por agente (minutos)")
-        st.dataframe(promedio_talk_min.round(2).to_frame())
-
         fig5, ax5 = plt.subplots(figsize=(10, 5))
         for agente in agentes_dist:
             sns.histplot(df_dist_filtrado[df_dist_filtrado["Agent Name"] == agente]["Talk Time"].dt.total_seconds() / 60, bins=30, kde=True, label=agente, ax=ax5)
