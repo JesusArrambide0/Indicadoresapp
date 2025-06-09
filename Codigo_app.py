@@ -176,17 +176,20 @@ with tab3:
     fig, ax = plt.subplots(figsize=(12, 6))
     sns.heatmap(pivot_table, cmap="viridis", annot=True, fmt="d", ax=ax)
     ax.invert_yaxis()
+    ax.set_title("Llamadas entrantes por hora y día")
     st.pyplot(fig)
 
 with tab4:
-    st.header("Heatmap de Llamadas Perdidas (Únicas)")
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.heatmap(pivot_table_perdidas, cmap="coolwarm", annot=True, fmt="d", ax=ax)
-    ax.invert_yaxis()
-    st.pyplot(fig)
+    st.header("Heatmap de Llamadas Perdidas (solo llamadas únicas)")
+    fig2, ax2 = plt.subplots(figsize=(12, 6))
+    sns.heatmap(pivot_table_perdidas, cmap="rocket_r", annot=True, fmt="d", ax=ax2)
+    ax2.invert_yaxis()
+    ax2.set_title("Llamadas perdidas únicas por hora y día")
+    st.pyplot(fig2)
 
 with tab5:
-    st.header("Distribución & Alertas")
+    st.header("Distribución y Alertas")
+    st.write("Implementa tus gráficos o análisis adicionales aquí.")
     st.subheader("Distribución de 'Talk Time' por agente")
     agentes_dist = st.multiselect("Selecciona agentes para distribución:", options=df_filtrado["Agent Name"].unique(), default=df_filtrado["Agent Name"].unique())
 
