@@ -8,16 +8,17 @@ import numpy as np
 archivo_excel = "AppInfo.xlsx"
 df = pd.read_excel(archivo_excel, engine="openpyxl")
 
-# Normalizar nombres
+# Normalizar nombres (con reemplazo de Maria Teresa por Gabriela Lizeth)
 mapeo_a_nombre_completo = {
     "Jorge": "Jorge Cesar Flores Rivera",
-    "Maria": "Maria Teresa Loredo Morales",
+    "Maria": "Gabriela Lizeth Hernandez",
     "Jonathan": "Jonathan Alejandro Zúñiga",
 }
 df["Agent Name"] = df["Agent Name"].replace(mapeo_a_nombre_completo)
 
 # Procesamiento inicial
-df["Call Start Time"] = pd.to_datetime(df["Call Start Time"], errors="coerce")
+# Interpretar "Call Start Time" en formato dd/mm/aa hh:mm:ss
+df["Call Start Time"] = pd.to_datetime(df["Call Start Time"], format="%d/%m/%y %H:%M:%S", errors="coerce")
 
 # Eliminar filas con fechas inválidas
 df = df.dropna(subset=["Call Start Time"])
@@ -38,16 +39,16 @@ df["DíaSemana"] = df["DíaSemana_En"].map(dias_traducidos)
 # Identificar llamadas perdidas por Talk Time
 df["LlamadaPerdida"] = df["Talk Time"] == pd.Timedelta("0:00:00")
 
-# Función para asignar agente según horario
+# Función para asignar agente según horario (con Maria Teresa cambiado a Gabriela)
 def agentes_por_horario(hora):
     if 8 <= hora < 10:
         return ["Jorge Cesar Flores Rivera"]
     elif 10 <= hora < 12:
-        return ["Jorge Cesar Flores Rivera", "Maria Teresa Loredo Morales"]
+        return ["Jorge Cesar Flores Rivera", "Gabriela Lizeth Hernandez"]
     elif 12 <= hora < 16:
-        return ["Jorge Cesar Flores Rivera", "Maria Teresa Loredo Morales", "Jonathan Alejandro Zúñiga"]
+        return ["Jorge Cesar Flores Rivera", "Gabriela Lizeth Hernandez", "Jonathan Alejandro Zúñiga"]
     elif 16 <= hora < 18:
-        return ["Jonathan Alejandro Zúñiga", "Maria Teresa Loredo Morales"]
+        return ["Jonathan Alejandro Zúñiga", "Gabriela Lizeth Hernandez"]
     elif 18 <= hora < 20:
         return ["Jonathan Alejandro Zúñiga"]
     else:
@@ -165,16 +166,23 @@ with tab1:
     total_dias = df_productividad.shape[0]
     porcentaje_cumplen = (dias_cumplen / total_dias * 100) if total_dias > 0 else 0
 
-    st.markdown(f"### Cumplimiento de Meta")
-    st.markdown(f"- **Días que cumplen meta (≥97% Productividad):** {dias_cumplen} días")
-    st.markdown(f"- **Porcentaje de cumplimiento:** {porcentaje_cumplen:.2f} %")
+    st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
+
+    # Gráfico líneas productividad
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.lineplot(data=df_productividad, x="Fecha", y="Productividad (%)", marker="o", ax=ax)
+    ax.axhline(97, color="green", linestyle="--", label="Meta 97%")
+    ax.axhline(90, color="orange", linestyle="--", label="Alerta 90%")
+    ax.set_ylim(0, 105)
+    ax.set_ylabel("Productividad (%)")
+    ax.set_title("Productividad diaria")
+    ax.legend()
+    st.pyplot(fig)
 
 with tab2:
     st.header("Detalle Diario por Programador")
-    agente_seleccionado = st.selectbox("Selecciona Programador:", detalle["AgenteFinal"].unique())
-    detalle_agente = detalle[detalle["AgenteFinal"] == agente_seleccionado].sort_values("Fecha")
 
-    def color_fila_detalle(row):
+    def color_fila_tab2(row):
         valor = row["Productividad (%)"]
         if valor >= 97:
             color = "background-color: #28a745; color: white;"
@@ -184,83 +192,78 @@ with tab2:
             color = "background-color: #dc3545; color: white;"
         return [color] * len(row)
 
-    detalle_tabla = detalle_agente[["Fecha", "LlamadasTotales", "LlamadasPerdidas", "LlamadasAtendidas", "Productividad (%)", "Promedio Talk Time (seg)"]]
-    styled_detalle = detalle_tabla.style.apply(color_fila_detalle, axis=1).format({"Productividad (%)": "{:.2f}", "Promedio Talk Time (seg)": "{:.2f}"})
+    styled_detalle = detalle[["AgenteFinal", "Fecha", "LlamadasTotales", "LlamadasPerdidas", "LlamadasAtendidas", "Productividad (%)", "Promedio Talk Time (seg)"]].style.apply(color_fila_tab2, axis=1).format({"Productividad (%)": "{:.2f}", "Promedio Talk Time (seg)": "{:.2f}"})
     st.dataframe(styled_detalle)
 
-    dias_cumplen_prog = detalle_agente[detalle_agente["Productividad (%)"] >= 97].shape[0]
-    total_dias_prog = detalle_agente.shape[0]
-    porcentaje_cumplen_prog = (dias_cumplen_prog / total_dias_prog * 100) if total_dias_prog > 0 else 0
+    agentes_seleccionados = st.multiselect("Selecciona programadores para ver gráfica:", options=detalle["AgenteFinal"].unique(), default=detalle["AgenteFinal"].unique())
 
-    st.markdown(f"### Cumplimiento de Meta para {agente_seleccionado}")
-    st.markdown(f"- **Días que cumplen meta (≥97% Productividad):** {dias_cumplen_prog} días")
-    st.markdown(f"- **Porcentaje de cumplimiento:** {porcentaje_cumplen_prog:.2f} %")
-
-    st.markdown("---")
-    st.subheader("📊 Promedio de Productividad por Agente (Fechas Filtradas)")
-    promedio_productividad = (
-        detalle.groupby("AgenteFinal")["Productividad (%)"]
-        .mean()
-        .round(2)
-        .sort_values(ascending=False)
-    )
-    st.dataframe(
-        promedio_productividad.reset_index().rename(columns={"Productividad (%)": "Promedio Productividad (%)"}),
-        use_container_width=True
-    )
+    if agentes_seleccionados:
+        fig2, ax2 = plt.subplots(figsize=(10, 4))
+        for agente in agentes_seleccionados:
+            df_plot = detalle[detalle["AgenteFinal"] == agente]
+            ax2.plot(df_plot["Fecha"], df_plot["Productividad (%)"], marker="o", label=agente)
+        ax2.axhline(97, color="green", linestyle="--", label="Meta 97%")
+        ax2.axhline(90, color="orange", linestyle="--", label="Alerta 90%")
+        ax2.set_ylim(0, 105)
+        ax2.set_ylabel("Productividad (%)")
+        ax2.set_title("Productividad diaria por programador")
+        ax2.legend()
+        st.pyplot(fig2)
 
 with tab3:
-    st.header("Heatmap de Llamadas Entrantes")
-    plt.figure(figsize=(10, 6))
-    sns.heatmap(pivot_table, annot=True, fmt="d", cmap="YlGnBu")
-    st.pyplot(plt.gcf())
+    st.header("Heatmap Llamadas Entrantes (Horas vs Día)")
+
+    fig3, ax3 = plt.subplots(figsize=(12, 6))
+    sns.heatmap(pivot_table, annot=True, fmt="d", cmap="YlGnBu", ax=ax3)
+    ax3.set_xlabel("Día de la semana")
+    ax3.set_ylabel("Hora del día")
+    st.pyplot(fig3)
 
 with tab4:
-    st.header("Heatmap de Llamadas Perdidas")
-    plt.figure(figsize=(10, 6))
-    sns.heatmap(pivot_table_perdidas, annot=True, fmt="d", cmap="OrRd")
-    st.pyplot(plt.gcf())
+    st.header("Heatmap Llamadas Perdidas (Horas vs Día)")
+
+    fig4, ax4 = plt.subplots(figsize=(12, 6))
+    sns.heatmap(pivot_table_perdidas, annot=True, fmt="d", cmap="YlOrRd", ax=ax4)
+    ax4.set_xlabel("Día de la semana")
+    ax4.set_ylabel("Hora del día")
+    st.pyplot(fig4)
 
 with tab5:
-    st.header("Análisis detallado por Agente")
+    st.header("Distribución de Duración de Llamadas y Alertas")
 
-    agente_seleccionado = st.selectbox("Selecciona Agente", options=df_expandido_filtrado["AgenteFinal"].unique(), key="tab5_agente")
+    st.subheader("Distribución de 'Talk Time' por agente")
+    agentes_dist = st.multiselect("Selecciona agentes para distribución:", options=df_filtrado["Agent Name"].unique(), default=df_filtrado["Agent Name"].unique())
 
-    df_agente_talktime = df_expandido_filtrado[
-        (df_expandido_filtrado["AgenteFinal"] == agente_seleccionado) & (~df_expandido_filtrado["LlamadaPerdida"])
-    ]
+    df_dist_filtrado = df_filtrado[df_filtrado["Agent Name"].isin(agentes_dist) & (df_filtrado["Talk Time"] > pd.Timedelta(0))]
 
-    if not df_agente_talktime.empty and df_agente_talktime["Talk Time"].notna().any():
-        talktime_seconds = df_agente_talktime["Talk Time"].dt.total_seconds()
-
-        fig_hist_talk, ax_hist_talk = plt.subplots()
-        ax_hist_talk.hist(talktime_seconds, bins=30, color='skyblue', edgecolor='black')
-        ax_hist_talk.set_title(f"Distribución de Talk Time (segundos) - {agente_seleccionado}")
-        ax_hist_talk.set_xlabel("Segundos")
-        ax_hist_talk.set_ylabel("Frecuencia")
-        st.pyplot(fig_hist_talk)
-
-        promedio_talktime = talktime_seconds.mean()
-        st.write(f"Promedio de Talk Time para {agente_seleccionado}: **{promedio_talktime:.2f} segundos**")
+    if not df_dist_filtrado.empty:
+        fig5, ax5 = plt.subplots(figsize=(10, 5))
+        for agente in agentes_dist:
+            sns.histplot(df_dist_filtrado[df_dist_filtrado["Agent Name"] == agente]["Talk Time"].dt.total_seconds() / 60, bins=30, kde=True, label=agente, ax=ax5)
+        ax5.set_xlabel("Duración de llamada (minutos)")
+        ax5.set_title("Distribución de duración de llamadas")
+        ax5.legend()
+        st.pyplot(fig5)
     else:
-        st.write(f"No hay datos de Talk Time para {agente_seleccionado} en el período seleccionado.")
-   # ===== INICIO ANÁLISIS RING TIME =====
-    st.header(f"Distribución y Promedio del Ring Time por Agente")
-    df_agente_ringtime = df_expandido_filtrado[
-        (df_expandido_filtrado["AgenteFinal"] == agente_seleccionado) & (~df_expandido_filtrado["LlamadaPerdida"])
-    ]
+        st.write("No hay datos de 'Talk Time' para los agentes seleccionados en el rango de fechas.")
 
-    if not df_agente_ringtime.empty and df_agente_ringtime["Ring Time"].notna().any():
-        ringtime_seconds = df_agente_ringtime["Ring Time"].dt.total_seconds()
-        fig_hist_ring, ax_hist_ring = plt.subplots()
-        ax_hist_ring.hist(ringtime_seconds, bins=30, color='lightcoral', edgecolor='black')
-        ax_hist_ring.set_title(f"Distribución de Ring Time (segundos) - {agente_seleccionado}")
-        ax_hist_ring.set_xlabel("Segundos")
-        ax_hist_ring.set_ylabel("Frecuencia")
-        st.pyplot(fig_hist_ring)
+    st.subheader("Distribución de 'Ring Time' por agente")
+    agentes_ring = st.multiselect("Selecciona agentes para distribución de 'Ring Time':", options=df_filtrado["Agent Name"].unique(), default=df_filtrado["Agent Name"].unique())
 
-        promedio_ringtime = ringtime_seconds.mean()
-        st.write(f"Promedio de Ring Time para {agente_seleccionado}: **{promedio_ringtime:.2f} segundos**")
+    df_ring_filtrado = df_filtrado[df_filtrado["Agent Name"].isin(agentes_ring) & (df_filtrado["Ring Time"] > pd.Timedelta(0))]
+
+    if not df_ring_filtrado.empty:
+        fig6, ax6 = plt.subplots(figsize=(10, 5))
+        for agente in agentes_ring:
+            sns.histplot(df_ring_filtrado[df_ring_filtrado["Agent Name"] == agente]["Ring Time"].dt.total_seconds() / 60, bins=30, kde=True, label=agente, ax=ax6)
+        ax6.set_xlabel("Ring Time (minutos)")
+        ax6.set_title("Distribución de 'Ring Time'")
+        ax6.legend()
+        st.pyplot(fig6)
+
+        promedio_ring = df_ring_filtrado.groupby("Agent Name")["Ring Time"].mean()
+        promedio_ring_min = promedio_ring.dt.total_seconds() / 60
+        st.markdown("### Promedio de 'Ring Time' por agente (minutos)")
+        st.dataframe(promedio_ring_min.round(2).to_frame())
     else:
-        st.write(f"No hay datos de Ring Time para {agente_seleccionado} en el rango seleccionado.")
-    # ===== FIN ANÁLISIS RING TIME =====
+        st.write("No hay datos de 'Ring Time' para los agentes seleccionados en el rango de fechas.")
