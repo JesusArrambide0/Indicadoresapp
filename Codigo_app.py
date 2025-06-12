@@ -169,14 +169,17 @@ with tab1:
     st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
 
 with tab2:
-    st.header("Detalle Diario por Programador")
-
-    # Selector de agentes solo aquí (tab2)
-    agentes_unicos = sorted(detalle["AgenteFinal"].unique())
-    agente_seleccionado = st.selectbox("Selecciona un agente para el detalle", agentes_unicos)
-    detalle_filtrado = detalle[detalle["AgenteFinal"] == agente_seleccionado]
+    st.subheader("Detalle de llamadas por agente")
+    
+    agentes_seleccionados = st.multiselect(
+        "Selecciona agente(s):",
+        options=detalle["AgenteFinal"].unique(),
+        default=detalle["AgenteFinal"].unique()
+    )
 
     detalle_filtrado = detalle[detalle["AgenteFinal"].isin(agentes_seleccionados)]
+
+    st.dataframe(detalle_filtrado)
 
     # Tabla resumen filtrada y coloreada
     def color_fila_tab2(row):
