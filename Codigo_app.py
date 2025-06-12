@@ -78,7 +78,6 @@ fecha_seleccion = st.date_input("Selecciona un rango de fechas:", [fecha_min, fe
 if isinstance(fecha_seleccion, tuple) or isinstance(fecha_seleccion, list):
     fecha_inicio, fecha_fin = fecha_seleccion
 else:
-    # Si solo seleccionan un día
     fecha_inicio = fecha_fin = fecha_seleccion
 
 df_filtrado = df[(df["Fecha"] >= fecha_inicio) & (df["Fecha"] <= fecha_fin)]
@@ -87,7 +86,7 @@ df_expandido_filtrado = df_expandido[(df_expandido["Fecha"] >= fecha_inicio) & (
 # Productividad General con Llamadas Perdidas basadas en la condición exacta
 df_productividad = df_filtrado.groupby("Fecha").agg(
     LlamadasRecibidas=("Talk Time", "count"),
-    LlamadasPerdidas=("LlamadaPerdida", "sum")  # Usamos la columna LlamadaPerdida
+    LlamadasPerdidas=("LlamadaPerdida", "sum")
 ).reset_index()
 
 df_productividad["Productividad (%)"] = (
@@ -101,12 +100,20 @@ df_productividad["DíaSemana"] = pd.to_datetime(df_productividad["Fecha"]).dt.da
 detalle = df_expandido_filtrado.groupby(["AgenteFinal", "Fecha"]).agg(
     LlamadasTotales=("Talk Time", "count"),
     LlamadasPerdidas=("LlamadaPerdida", "sum"),
-    TalkTimeTotal=("Talk Time", "sum")
+    TalkTimeTotal=("Talk Time", "sum"),
+    RingTimeTotal=("Ring Time", "sum")
 ).reset_index()
 
 detalle["LlamadasAtendidas"] = detalle["LlamadasTotales"] - detalle["LlamadasPerdidas"]
 detalle["Productividad (%)"] = (detalle["LlamadasAtendidas"] / detalle["LlamadasTotales"] * 100).round(2)
 detalle["Promedio Talk Time (seg)"] = (detalle["TalkTimeTotal"].dt.total_seconds() / detalle["LlamadasAtendidas"]).round(2)
+detalle["Promedio Ring Time (seg)"] = (detalle["RingTimeTotal"].dt.total_seconds() / detalle["LlamadasTotales"]).round(2)
+
+# Filtro por agentes para la pestaña detalle
+agentes_unicos = sorted(detalle["AgenteFinal"].unique())
+agentes_seleccionados = st.sidebar.multiselect("Selecciona Agentes para Detalle", agentes_unicos, default=agentes_unicos)
+
+detalle_filtrado = detalle[detalle["AgenteFinal"].isin(agentes_seleccionados)]
 
 dias_validos = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 dias_validos_es = [dias_traducidos[d] for d in dias_validos]
@@ -136,7 +143,7 @@ pivot_table_perdidas.columns = [dias_traducidos[d] for d in pivot_table_perdidas
 pivot_table_perdidas = pivot_table_perdidas.reindex(horas_ordenadas[::-1], fill_value=0)
 pivot_table_perdidas.index = [f"{h}:00" for h in pivot_table_perdidas.index]
 
-# Definición de tabs
+# Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Productividad General",
     "Detalle por Programador",
@@ -180,8 +187,12 @@ with tab2:
             color = "background-color: #dc3545; color: white;"
         return [color] * len(row)
 
-    detalle_mostrar = detalle.sort_values(["AgenteFinal", "Fecha"])
-    styled_detalle = detalle_mostrar.style.apply(color_fila_tab2, axis=1).format({"Productividad (%)": "{:.2f}", "Promedio Talk Time (seg)": "{:.1f}"})
+    detalle_mostrar = detalle_filtrado.sort_values(["AgenteFinal", "Fecha"])
+    styled_detalle = detalle_mostrar.style.apply(color_fila_tab2, axis=1).format({
+        "Productividad (%)": "{:.2f}",
+        "Promedio Talk Time (seg)": "{:.1f}",
+        "Promedio Ring Time (seg)": "{:.1f}"
+    })
     st.dataframe(styled_detalle)
 
 with tab3:
@@ -203,11 +214,23 @@ with tab4:
 with tab5:
     st.header("Distribución de Duración de Llamadas y Alertas")
 
-    st.subheader("Distribución de Duración de Llamadas (segundos)")
+    st.subheader("Distribución de Duración de Llamadas (Talk Time en segundos)")
     duracion_segundos = df_filtrado["Talk Time"].dt.total_seconds()
     fig3, ax3 = plt.subplots()
     sns.histplot(duracion_segundos[duracion_segundos > 0], bins=30, kde=True, ax=ax3)
     st.pyplot(fig3)
+
+    promedio_talk = duracion_segundos[duracion_segundos > 0].mean()
+    st.markdown(f"**Promedio Talk Time:** {promedio_talk:.2f} segundos")
+
+    st.subheader("Distribución de Duración de Ring Time (segundos)")
+    ring_segundos = df_filtrado["Ring Time"].dt.total_seconds()
+    fig4, ax4 = plt.subplots()
+    sns.histplot(ring_segundos[ring_segundos > 0], bins=30, kde=True, ax=ax4, color="orange")
+    st.pyplot(fig4)
+
+    promedio_ring = ring_segundos[ring_segundos > 0].mean()
+    st.markdown(f"**Promedio Ring Time:** {promedio_ring:.2f} segundos")
 
     # Alertas: días con picos muy altos (ejemplo simple)
     umbral_pico = df_productividad["LlamadasRecibidas"].mean() + 2 * df_productividad["LlamadasRecibidas"].std()
