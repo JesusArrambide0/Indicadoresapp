@@ -31,6 +31,7 @@ dias_traducidos = {
 }
 df["DíaSemana"] = df["DíaSemana_En"].map(dias_traducidos)
 
+# Definir llamada perdida: Talk Time 0 y Agent Name vacío o NaN
 df["LlamadaPerdida"] = (
     (df["Talk Time"] == pd.Timedelta(0)) &
     (df["Agent Name"].isna() | (df["Agent Name"].str.strip() == ""))
@@ -83,9 +84,10 @@ else:
 df_filtrado = df[(df["Fecha"] >= fecha_inicio) & (df["Fecha"] <= fecha_fin)]
 df_expandido_filtrado = df_expandido[(df_expandido["Fecha"] >= fecha_inicio) & (df_expandido["Fecha"] <= fecha_fin)]
 
+# Productividad General con Llamadas Perdidas basadas en la condición exacta
 df_productividad = df_filtrado.groupby("Fecha").agg(
     LlamadasRecibidas=("Talk Time", "count"),
-    LlamadasPerdidas=("Talk Time", lambda x: (x == pd.Timedelta("0:00:00")).sum())
+    LlamadasPerdidas=("LlamadaPerdida", "sum")  # Usamos la columna LlamadaPerdida
 ).reset_index()
 
 df_productividad["Productividad (%)"] = (
@@ -95,6 +97,7 @@ df_productividad["Productividad (%)"] = (
 df_productividad["Tasa de Abandono (%)"] = 100 - df_productividad["Productividad (%)"]
 df_productividad["DíaSemana"] = pd.to_datetime(df_productividad["Fecha"]).dt.day_name().map(dias_traducidos)
 
+# Detalle por Programador con misma lógica de llamadas perdidas
 detalle = df_expandido_filtrado.groupby(["AgenteFinal", "Fecha"]).agg(
     LlamadasTotales=("Talk Time", "count"),
     LlamadasPerdidas=("LlamadaPerdida", "sum"),
@@ -133,7 +136,7 @@ pivot_table_perdidas.columns = [dias_traducidos[d] for d in pivot_table_perdidas
 pivot_table_perdidas = pivot_table_perdidas.reindex(horas_ordenadas[::-1], fill_value=0)
 pivot_table_perdidas.index = [f"{h}:00" for h in pivot_table_perdidas.index]
 
-# Definición de tabs (importante que esté antes de los with)
+# Definición de tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Productividad General",
     "Detalle por Programador",
@@ -200,19 +203,16 @@ with tab4:
 with tab5:
     st.header("Distribución de Duración de Llamadas y Alertas")
 
-    st.subheader("Distribución de Duración (en segundos)")
-    duracion_seg = df_filtrado["Talk Time"].dt.total_seconds().dropna()
+    st.subheader("Distribución de Duración de Llamadas (segundos)")
+    duracion_segundos = df_filtrado["Talk Time"].dt.total_seconds()
     fig3, ax3 = plt.subplots()
-    sns.histplot(duracion_seg, bins=30, ax=ax3)
+    sns.histplot(duracion_segundos[duracion_segundos > 0], bins=30, kde=True, ax=ax3)
     st.pyplot(fig3)
 
-    # Alertas por picos - ejemplo sencillo de llamadas por hora
-    llamadas_por_hora = df_filtrado.groupby("Hora").size()
-    umbral_pico = llamadas_por_hora.mean() + 2 * llamadas_por_hora.std()
-    picos = llamadas_por_hora[llamadas_por_hora > umbral_pico]
-
-    if not picos.empty:
-        st.warning(f"Se detectaron picos inusuales de llamadas en las horas: {', '.join(map(str, picos.index))}")
+    # Alertas: días con picos muy altos (ejemplo simple)
+    umbral_pico = df_productividad["LlamadasRecibidas"].mean() + 2 * df_productividad["LlamadasRecibidas"].std()
+    dias_pico = df_productividad[df_productividad["LlamadasRecibidas"] > umbral_pico]["Fecha"].tolist()
+    if dias_pico:
+        st.warning(f"Días con picos inusuales de llamadas: {', '.join(str(d) for d in dias_pico)}")
     else:
-        st.info("No se detectaron picos inusuales de llamadas.")
-
+        st.info("No se detectaron picos inusuales de llamadas en el rango seleccionado.")
