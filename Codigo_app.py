@@ -172,9 +172,9 @@ with tab2:
     st.header("Detalle Diario por Programador")
 
     # Selector de agentes solo aquí (tab2)
-agentes_unicos = sorted(detalle["AgenteFinal"].unique())
-agente_seleccionado = st.selectbox("Selecciona un agente para el detalle", agentes_unicos)
-detalle_filtrado = detalle[detalle["AgenteFinal"] == agente_seleccionado]
+    agentes_unicos = sorted(detalle["AgenteFinal"].unique())
+    agente_seleccionado = st.selectbox("Selecciona un agente para el detalle", agentes_unicos)
+    detalle_filtrado = detalle[detalle["AgenteFinal"] == agente_seleccionado]
 
     detalle_filtrado = detalle[detalle["AgenteFinal"].isin(agentes_seleccionados)]
 
