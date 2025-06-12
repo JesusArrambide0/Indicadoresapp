@@ -36,11 +36,11 @@ dias_traducidos = {
 }
 df["DíaSemana"] = df["DíaSemana_En"].map(dias_traducidos)
 
-# Identificar llamadas perdidas: Talk Time = '00:00:00' y Agent Name vacío o nulo
-llamadas_perdidas = df[
-    (df['Talk Time'] == '00:00:00') &
-    (df['Agent Name'].isna() | (df['Agent Name'].str.strip() == ''))
-].copy()
+# Identificar llamadas perdidas: Talk Time = 0 y Agent Name vacío o nulo
+df["LlamadaPerdida"] = (
+    (df["Talk Time"] == pd.Timedelta(0)) &
+    (df["Agent Name"].isna() | (df["Agent Name"].str.strip() == ""))
+)
 
 # Función para asignar agente según horario (con Maria Teresa cambiado a Gabriela)
 def agentes_por_horario(hora):
