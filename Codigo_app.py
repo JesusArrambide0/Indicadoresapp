@@ -174,9 +174,31 @@ with tab1:
 
     st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
 
+# Dentro de Tab 2: filtro de agentes + boxplot Talk Time + tabla filtrada
 with tab2:
     st.header("Detalle Diario por Programador")
 
+    # Selector de agentes solo aquí (tab2)
+    agentes_unicos = sorted(detalle["AgenteFinal"].unique())
+    agentes_seleccionados = st.multiselect("Selecciona Agentes para Detalle", agentes_unicos, default=agentes_unicos)
+
+    detalle_filtrado = detalle[detalle["AgenteFinal"].isin(agentes_seleccionados)]
+
+    st.subheader("Boxplot de Talk Time por Agente")
+    df_box = df_expandido_filtrado[
+        (df_expandido_filtrado["AgenteFinal"].isin(agentes_seleccionados)) &
+        (df_expandido_filtrado["Talk Time"] > pd.Timedelta(0))
+    ].copy()
+    df_box["TalkTime_seg"] = df_box["Talk Time"].dt.total_seconds()
+
+    fig_box, ax_box = plt.subplots(figsize=(10, 5))
+    sns.boxplot(x="AgenteFinal", y="TalkTime_seg", data=df_box, ax=ax_box)
+    ax_box.set_ylabel("Talk Time (segundos)")
+    ax_box.set_xlabel("Agente")
+    ax_box.set_title("Distribución de Talk Time por Agente")
+    st.pyplot(fig_box)
+
+    # Tabla resumen filtrada y coloreada
     def color_fila_tab2(row):
         valor = row["Productividad (%)"]
         if valor >= 97:
@@ -190,11 +212,9 @@ with tab2:
     detalle_mostrar = detalle_filtrado.sort_values(["AgenteFinal", "Fecha"])
     styled_detalle = detalle_mostrar.style.apply(color_fila_tab2, axis=1).format({
         "Productividad (%)": "{:.2f}",
-        "Promedio Talk Time (seg)": "{:.1f}",
-        "Promedio Ring Time (seg)": "{:.1f}"
+        "Promedio Talk Time (seg)": "{:.1f}"
     })
     st.dataframe(styled_detalle)
-
 with tab3:
     st.header("Heatmap de Llamadas Recibidas")
 
@@ -211,31 +231,36 @@ with tab4:
     ax2.set_title("Llamadas Perdidas por Hora y Día")
     st.pyplot(fig2)
 
+# Dentro de Tab 5: análisis adicional para Ring Time
 with tab5:
     st.header("Distribución de Duración de Llamadas y Alertas")
 
-    st.subheader("Distribución de Duración de Llamadas (Talk Time en segundos)")
-    duracion_segundos = df_filtrado["Talk Time"].dt.total_seconds()
+    st.subheader("Distribución de Duración (Talk Time en segundos)")
+    duracion_seg = df_filtrado["Talk Time"].dt.total_seconds().dropna()
     fig3, ax3 = plt.subplots()
-    sns.histplot(duracion_segundos[duracion_segundos > 0], bins=30, kde=True, ax=ax3)
+    sns.histplot(duracion_seg, bins=30, ax=ax3)
+    ax3.set_xlabel("Duración (segundos)")
+    ax3.set_ylabel("Cantidad de llamadas")
     st.pyplot(fig3)
 
-    promedio_talk = duracion_segundos[duracion_segundos > 0].mean()
-    st.markdown(f"**Promedio Talk Time:** {promedio_talk:.2f} segundos")
-
-    st.subheader("Distribución de Duración de Ring Time (segundos)")
-    ring_segundos = df_filtrado["Ring Time"].dt.total_seconds()
+    st.subheader("Distribución de Duración (Ring Time en segundos)")
+    ring_time_seg = df_filtrado["Ring Time"].dt.total_seconds().dropna()
     fig4, ax4 = plt.subplots()
-    sns.histplot(ring_segundos[ring_segundos > 0], bins=30, kde=True, ax=ax4, color="orange")
+    sns.histplot(ring_time_seg, bins=30, color='orange', ax=ax4)
+    ax4.set_xlabel("Ring Time (segundos)")
+    ax4.set_ylabel("Cantidad de llamadas")
     st.pyplot(fig4)
 
-    promedio_ring = ring_segundos[ring_segundos > 0].mean()
-    st.markdown(f"**Promedio Ring Time:** {promedio_ring:.2f} segundos")
+    st.subheader("Promedio Ring Time por Día")
+    promedio_ring_por_dia = df_filtrado.groupby("Fecha")["Ring Time"].mean().dt.total_seconds()
+    st.line_chart(promedio_ring_por_dia)
 
-    # Alertas: días con picos muy altos (ejemplo simple)
-    umbral_pico = df_productividad["LlamadasRecibidas"].mean() + 2 * df_productividad["LlamadasRecibidas"].std()
-    dias_pico = df_productividad[df_productividad["LlamadasRecibidas"] > umbral_pico]["Fecha"].tolist()
-    if dias_pico:
-        st.warning(f"Días con picos inusuales de llamadas: {', '.join(str(d) for d in dias_pico)}")
+    # Alertas por picos - ejemplo sencillo de llamadas por hora (Talk Time)
+    llamadas_por_hora = df_filtrado.groupby("Hora").size()
+    umbral_pico = llamadas_por_hora.mean() + 2 * llamadas_por_hora.std()
+    picos = llamadas_por_hora[llamadas_por_hora > umbral_pico]
+
+    if not picos.empty:
+        st.warning(f"Se detectaron picos inusuales de llamadas en las horas: {', '.join(map(str, picos.index))}")
     else:
-        st.info("No se detectaron picos inusuales de llamadas en el rango seleccionado.")
+        st.info("No se detectaron picos inusuales de llamadas.")
