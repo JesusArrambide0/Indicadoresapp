@@ -168,7 +168,6 @@ with tab1:
 
     st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
 
-# Dentro de Tab 2: filtro de agentes + boxplot Talk Time + tabla filtrada
 with tab2:
     st.header("Detalle Diario por Programador")
 
@@ -177,20 +176,6 @@ with tab2:
     agentes_seleccionados = st.multiselect("Selecciona Agentes para Detalle", agentes_unicos, default=agentes_unicos)
 
     detalle_filtrado = detalle[detalle["AgenteFinal"].isin(agentes_seleccionados)]
-
-    st.subheader("Boxplot de Talk Time por Agente")
-    df_box = df_expandido_filtrado[
-        (df_expandido_filtrado["AgenteFinal"].isin(agentes_seleccionados)) &
-        (df_expandido_filtrado["Talk Time"] > pd.Timedelta(0))
-    ].copy()
-    df_box["TalkTime_seg"] = df_box["Talk Time"].dt.total_seconds()
-
-    fig_box, ax_box = plt.subplots(figsize=(10, 5))
-    sns.boxplot(x="AgenteFinal", y="TalkTime_seg", data=df_box, ax=ax_box)
-    ax_box.set_ylabel("Talk Time (segundos)")
-    ax_box.set_xlabel("Agente")
-    ax_box.set_title("Distribución de Talk Time por Agente")
-    st.pyplot(fig_box)
 
     # Tabla resumen filtrada y coloreada
     def color_fila_tab2(row):
@@ -216,6 +201,8 @@ with tab2:
 
     st.dataframe(styled_detalle)
 
+    # Ya no mostramos boxplot aquí (removido)
+
 with tab3:
     st.header("Heatmap de Llamadas Atendidas")
     fig_heat, ax_heat = plt.subplots(figsize=(12, 8))
@@ -233,22 +220,41 @@ with tab4:
 with tab5:
     st.header("Distribución y Alertas")
 
-    # Histograma de duración de llamadas atendidas
-    df_talktime = df_expandido_filtrado[~df_expandido_filtrado["LlamadaPerdida"]].copy()
-    df_talktime["TalkTime_seg"] = df_talktime["Talk Time"].dt.total_seconds()
+    agentes_unicos_tab5 = sorted(df_expandido_filtrado["AgenteFinal"].unique())
+    agente_tab5_seleccionado = st.selectbox("Selecciona un agente para análisis", agentes_unicos_tab5)
 
-    fig_dist, ax_dist = plt.subplots(figsize=(10, 5))
-    sns.histplot(df_talktime["TalkTime_seg"], bins=30, kde=True, ax=ax_dist)
+    df_agente = df_expandido_filtrado[df_expandido_filtrado["AgenteFinal"] == agente_tab5_seleccionado]
+    df_agente_talktime = df_agente[~df_agente["LlamadaPerdida"]].copy()
+    df_agente_talktime["TalkTime_seg"] = df_agente_talktime["Talk Time"].dt.total_seconds()
+    df_agente["RingTime_seg"] = df_agente["Ring Time"].dt.total_seconds()
+
+    # Histograma Talk Time
+    fig_dist, ax_dist = plt.subplots(figsize=(10, 4))
+    sns.histplot(df_agente_talktime["TalkTime_seg"], bins=30, kde=True, ax=ax_dist)
     ax_dist.set_xlabel("Duración de llamada (segundos)")
-    ax_dist.set_title("Distribución de Duración de Llamadas Atendidas")
+    ax_dist.set_title(f"Distribución Duración de Llamadas Atendidas - {agente_tab5_seleccionado}")
     st.pyplot(fig_dist)
 
-    # Alertas simples: detectar días con baja productividad general (<90%)
-    dias_alerta = df_productividad[df_productividad["Productividad (%)"] < 90]
+    promedio_talk = df_agente_talktime["TalkTime_seg"].mean()
+    st.markdown(f"**Promedio Talk Time:** {promedio_talk:.2f} segundos")
+
+    # Histograma Ring Time
+    fig_ring, ax_ring = plt.subplots(figsize=(10, 4))
+    sns.histplot(df_agente["RingTime_seg"], bins=30, kde=True, ax=ax_ring, color="orange")
+    ax_ring.set_xlabel("Ring Time (segundos)")
+    ax_ring.set_title(f"Distribución de Ring Time - {agente_tab5_seleccionado}")
+    st.pyplot(fig_ring)
+
+    promedio_ring = df_agente["RingTime_seg"].mean()
+    st.markdown(f"**Promedio Ring Time:** {promedio_ring:.2f} segundos")
+
+    # Alertas simple (ejemplo: días con productividad menor a 90% para agente seleccionado)
+    detalle_agente = detalle[(detalle["AgenteFinal"] == agente_tab5_seleccionado) & (detalle["Fecha"] >= fecha_inicio) & (detalle["Fecha"] <= fecha_fin)]
+    dias_alerta = detalle_agente[detalle_agente["Productividad (%)"] < 90]
 
     if not dias_alerta.empty:
-        st.warning(f"Días con productividad < 90% detectados:")
-        st.dataframe(dias_alerta[["Fecha", "Productividad (%)", "LlamadasRecibidas", "LlamadasPerdidas"]])
+        st.warning(f"Días con productividad < 90% para {agente_tab5_seleccionado}:")
+        st.dataframe(dias_alerta[["Fecha", "Productividad (%)", "LlamadasTotales", "LlamadasPerdidas"]])
     else:
-        st.success("No se detectaron días con productividad menor a 90%.")
+        st.success(f"No se detectaron días con productividad menor a 90% para {agente_tab5_seleccionado}.")
 
