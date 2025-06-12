@@ -200,6 +200,7 @@ with tab2:
         "Promedio Talk Time (seg)": "{:.1f}",
         "Promedio Ring Time (seg)": "{:.1f}"
     })
+    
      st.dataframe(detalle_filtrado)
 
 with tab3:
