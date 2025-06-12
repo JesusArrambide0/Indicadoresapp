@@ -201,7 +201,7 @@ with tab2:
         "Promedio Ring Time (seg)": "{:.1f}"
     })
     
-     st.dataframe(detalle_filtrado)
+    st.dataframe(detalle_filtrado)
 
 with tab3:
     st.header("Heatmap de Llamadas Atendidas")
