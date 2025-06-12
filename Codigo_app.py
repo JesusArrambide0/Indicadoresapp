@@ -179,9 +179,7 @@ with tab2:
 
     detalle_filtrado = detalle[detalle["AgenteFinal"].isin(agentes_seleccionados)]
 
-    st.dataframe(detalle_filtrado)
-
-    # Tabla resumen filtrada y coloreada
+       # Tabla resumen filtrada y coloreada
     def color_fila_tab2(row):
         valor = row["Productividad (%)"]
         if valor >= 97:
@@ -202,6 +200,7 @@ with tab2:
         "Promedio Talk Time (seg)": "{:.1f}",
         "Promedio Ring Time (seg)": "{:.1f}"
     })
+     st.dataframe(detalle_filtrado)
 
 with tab3:
     st.header("Heatmap de Llamadas Atendidas")
