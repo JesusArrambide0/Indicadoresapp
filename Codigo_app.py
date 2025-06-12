@@ -203,10 +203,6 @@ with tab2:
         "Promedio Ring Time (seg)": "{:.1f}"
     })
 
-    st.dataframe(styled_detalle)
-
-    # Ya no mostramos boxplot aquí (removido)
-
 with tab3:
     st.header("Heatmap de Llamadas Atendidas")
     fig_heat, ax_heat = plt.subplots(figsize=(12, 8))
