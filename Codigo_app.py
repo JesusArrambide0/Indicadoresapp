@@ -168,9 +168,6 @@ with tab1:
 
     st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
     
-     # Asegúrate que "Fecha" sólo tenga la parte de fecha (sin hora)
-df_productividad["Fecha"] = pd.to_datetime(df_productividad["Fecha"]).dt.normalize()
-
 # Gráfico líneas productividad
     fig, ax = plt.subplots(figsize=(10, 4))
     sns.lineplot(data=df_productividad, x="Fecha", y="Productividad (%)", marker="o", ax=ax)
