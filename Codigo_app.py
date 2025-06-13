@@ -168,18 +168,30 @@ with tab1:
 
     st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
     
-     # Gráfico líneas productividad
-    fig, ax = plt.subplots(figsize=(10, 4))
-    sns.lineplot(data=df_productividad, x="Fecha", y="Productividad (%)", marker="o", ax=ax)
-    ax.axhline(97, color="green", linestyle="--", label="Meta 97%")
-    ax.axhline(90, color="orange", linestyle="--", label="Alerta 90%")
-    ax.set_ylim(0, 105)
-    ax.set_ylabel("Productividad (%)")
-    ax.set_title("Productividad diaria")
-    ax.legend()
-    ax.grid(True, linestyle="--", alpha=0.6)
-    plt.xticks(rotation=45, ha="right")
-    st.pyplot(fig)
+     # Asegúrate que "Fecha" sólo tenga la parte de fecha (sin hora)
+df_productividad["Fecha"] = pd.to_datetime(df_productividad["Fecha"]).dt.normalize()
+
+# Gráfico líneas productividad
+fig, ax = plt.subplots(figsize=(10, 4))
+sns.lineplot(data=df_productividad, x="Fecha", y="Productividad (%)", marker="o", ax=ax)
+
+ax.axhline(97, color="green", linestyle="--", label="Meta 97%")
+ax.axhline(90, color="orange", linestyle="--", label="Alerta 90%")
+ax.set_ylim(0, 105)
+ax.set_ylabel("Productividad (%)")
+ax.set_title("Productividad diaria")
+
+# Formato de fecha en eje X: día-mes-año
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+
+# Ajustar intervalos automáticos para fechas
+ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+
+ax.legend()
+ax.grid(True, linestyle="--", alpha=0.6)
+
+plt.xticks(rotation=45, ha="right")
+st.pyplot(fig)
 
 with tab2:
     st.subheader("Detalle de llamadas por Programador")
