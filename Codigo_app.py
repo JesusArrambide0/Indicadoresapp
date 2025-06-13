@@ -169,9 +169,9 @@ with tab1:
     st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
 
 with tab2:
-    st.subheader("Detalle de llamadas por agente")
+    st.subheader("Detalle de llamadas por Programador")
     agentes_unicos_tab2 = sorted(detalle["AgenteFinal"].unique())
-    agente_tab2_seleccionado = st.selectbox("Selecciona un agente para análisis", agentes_unicos_tab2)
+    agente_tab2_seleccionado = st.selectbox("Selecciona un programador para análisis", agentes_unicos_tab2)
 
     detalle_filtrado = detalle[detalle["AgenteFinal"] == agente_tab2_seleccionado]
 
