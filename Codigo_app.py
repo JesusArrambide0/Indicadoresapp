@@ -120,7 +120,7 @@ pivot_table.columns = [dias_traducidos[d] for d in pivot_table.columns]
 pivot_table = pivot_table.sort_index(ascending=True)
 
 horas_ordenadas = list(range(8, 21))
-pivot_table = pivot_table.reindex(horas_ordenadas[::-1], fill_value=0)
+pivot_table = pivot_table.reindex(horas_ordenadas[::-1], fill_value=0)  # Invierte el orden aquí
 pivot_table.index = [f"{h}:00" for h in pivot_table.index]
 
 pivot_perdidas = df_expandido_filtrado[
@@ -134,7 +134,7 @@ pivot_table_perdidas = pivot_perdidas.pivot_table(
 )
 pivot_table_perdidas = pivot_table_perdidas.reindex(columns=dias_validos, fill_value=0)
 pivot_table_perdidas.columns = [dias_traducidos[d] for d in pivot_table_perdidas.columns]
-pivot_table_perdidas = pivot_table_perdidas.reindex(horas_ordenadas[::-1], fill_value=0)
+pivot_table_perdidas = pivot_table_perdidas.reindex(horas_ordenadas[::-1], fill_value=0)  # Invierte el orden aquí también
 pivot_table_perdidas.index = [f"{h}:00" for h in pivot_table_perdidas.index]
 
 # Tabs
@@ -175,7 +175,7 @@ with tab2:
 
     detalle_filtrado = detalle[detalle["AgenteFinal"] == agente_tab2_seleccionado]
 
-       # Tabla resumen filtrada y coloreada
+    # Tabla resumen filtrada y coloreada
     def color_fila_tab2(row):
         valor = row["Productividad (%)"]
         if valor >= 97:
@@ -197,60 +197,42 @@ with tab2:
         "Promedio Ring Time (seg)": "{:.1f}"
     })
     
-    st.dataframe(styled_detalle, use_container_width=True)
+    st.dataframe(styled_detalle)
 
 with tab3:
-    st.header("Heatmap de Llamadas Atendidas")
-    fig_heat, ax_heat = plt.subplots(figsize=(12, 8))
-    sns.heatmap(pivot_table, annot=True, fmt="d", cmap="Blues", ax=ax_heat)
-    ax_heat.invert_yaxis()
-    st.pyplot(fig_heat)
+    st.subheader("Heatmap de llamadas por hora y día")
+    fig, ax_heat = plt.subplots(figsize=(10, 6))
+    sns.heatmap(pivot_table, annot=True, fmt="d", cmap="YlGnBu", cbar=True, ax=ax_heat)
+    ax_heat.set_title("Cantidad de llamadas atendidas por hora y día (Lunes a Sábado)")
+    ax_heat.set_xlabel("Día de la semana")
+    ax_heat.set_ylabel("Hora del día")
+    st.pyplot(fig)
 
 with tab4:
-    st.header("Heatmap de Llamadas Perdidas")
-    fig_heat_perdidas, ax_heat_perdidas = plt.subplots(figsize=(12, 8))
-    sns.heatmap(pivot_table_perdidas, annot=True, fmt="d", cmap="Reds", ax=ax_heat_perdidas)
-    ax_heat_perdidas.invert_yaxis()
-    st.pyplot(fig_heat_perdidas)
+    st.subheader("Heatmap de llamadas perdidas por hora y día")
+    fig2, ax_heat_perdidas = plt.subplots(figsize=(10, 6))
+    sns.heatmap(pivot_table_perdidas, annot=True, fmt="d", cmap="YlOrRd", cbar=True, ax=ax_heat_perdidas)
+    ax_heat_perdidas.set_title("Cantidad de llamadas perdidas por hora y día (Lunes a Sábado)")
+    ax_heat_perdidas.set_xlabel("Día de la semana")
+    ax_heat_perdidas.set_ylabel("Hora del día")
+    st.pyplot(fig2)
 
 with tab5:
-    st.header("Distribución y Alertas")
+    st.subheader("Distribución de Duración de Llamadas Atendidas")
+    talk_times_seg = df_filtrado[~df_filtrado["LlamadaPerdida"]]["Talk Time"].dt.total_seconds()
+    if not talk_times_seg.empty:
+        fig3, ax3 = plt.subplots()
+        sns.histplot(talk_times_seg, bins=30, kde=True, ax=ax3)
+        ax3.set_title("Distribución de duración de llamadas atendidas (segundos)")
+        ax3.set_xlabel("Duración (segundos)")
+        st.pyplot(fig3)
 
-    agentes_unicos_tab5 = sorted(df_expandido_filtrado["AgenteFinal"].unique())
-    agente_tab5_seleccionado = st.selectbox("Selecciona un agente para análisis", agentes_unicos_tab5)
-
-    df_agente = df_expandido_filtrado[df_expandido_filtrado["AgenteFinal"] == agente_tab5_seleccionado]
-    df_agente_talktime = df_agente[~df_agente["LlamadaPerdida"]].copy()
-    df_agente_talktime["TalkTime_seg"] = df_agente_talktime["Talk Time"].dt.total_seconds()
-    df_agente["RingTime_seg"] = df_agente["Ring Time"].dt.total_seconds()
-
-    # Histograma Talk Time
-    fig_dist, ax_dist = plt.subplots(figsize=(10, 4))
-    sns.histplot(df_agente_talktime["TalkTime_seg"], bins=30, kde=True, ax=ax_dist)
-    ax_dist.set_xlabel("Duración de llamada (segundos)")
-    ax_dist.set_title(f"Distribución Duración de Llamadas Atendidas - {agente_tab5_seleccionado}")
-    st.pyplot(fig_dist)
-
-    promedio_talk = df_agente_talktime["TalkTime_seg"].mean()
-    st.markdown(f"**Promedio Talk Time:** {promedio_talk:.2f} segundos")
-
-    # Histograma Ring Time
-    fig_ring, ax_ring = plt.subplots(figsize=(10, 4))
-    sns.histplot(df_agente["RingTime_seg"], bins=30, kde=True, ax=ax_ring, color="orange")
-    ax_ring.set_xlabel("Ring Time (segundos)")
-    ax_ring.set_title(f"Distribución de Ring Time - {agente_tab5_seleccionado}")
-    st.pyplot(fig_ring)
-
-    promedio_ring = df_agente["RingTime_seg"].mean()
-    st.markdown(f"**Promedio Ring Time:** {promedio_ring:.2f} segundos")
-
-    # Alertas simple (ejemplo: días con productividad menor a 90% para agente seleccionado)
-    detalle_agente = detalle[(detalle["AgenteFinal"] == agente_tab5_seleccionado) & (detalle["Fecha"] >= fecha_inicio) & (detalle["Fecha"] <= fecha_fin)]
-    dias_alerta = detalle_agente[detalle_agente["Productividad (%)"] < 90]
-
-    if not dias_alerta.empty:
-        st.warning(f"Días con productividad < 90% para {agente_tab5_seleccionado}:")
-        st.dataframe(dias_alerta[["Fecha", "Productividad (%)", "LlamadasTotales", "LlamadasPerdidas"]])
+    # Alertas por picos de llamadas en fecha e intervalo horario
+    st.subheader("Alertas por picos de llamadas")
+    df_productividad["DíaSemanaNum"] = pd.to_datetime(df_productividad["Fecha"]).dt.weekday
+    picos = df_productividad[df_productividad["LlamadasRecibidas"] > df_productividad["LlamadasRecibidas"].mean() + 2*df_productividad["LlamadasRecibidas"].std()]
+    if not picos.empty:
+        for _, fila in picos.iterrows():
+            st.warning(f"Pico de llamadas detectado el {fila['Fecha']} ({fila['DíaSemana']}) con {fila['LlamadasRecibidas']} llamadas.")
     else:
-        st.success(f"No se detectaron días con productividad menor a 90% para {agente_tab5_seleccionado}.")
-
+        st.info("No se detectaron picos inusuales de llamadas en el rango seleccionado.")
