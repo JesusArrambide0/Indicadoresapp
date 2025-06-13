@@ -218,21 +218,42 @@ with tab4:
     st.pyplot(fig2)
 
 with tab5:
-    st.subheader("Distribución de Duración de Llamadas Atendidas")
-    talk_times_seg = df_filtrado[~df_filtrado["LlamadaPerdida"]]["Talk Time"].dt.total_seconds()
-    if not talk_times_seg.empty:
-        fig3, ax3 = plt.subplots()
-        sns.histplot(talk_times_seg, bins=30, kde=True, ax=ax3)
-        ax3.set_title("Distribución de duración de llamadas atendidas (segundos)")
-        ax3.set_xlabel("Duración (segundos)")
-        st.pyplot(fig3)
+    st.header("Distribución y Alertas")
 
-    # Alertas por picos de llamadas en fecha e intervalo horario
-    st.subheader("Alertas por picos de llamadas")
-    df_productividad["DíaSemanaNum"] = pd.to_datetime(df_productividad["Fecha"]).dt.weekday
-    picos = df_productividad[df_productividad["LlamadasRecibidas"] > df_productividad["LlamadasRecibidas"].mean() + 2*df_productividad["LlamadasRecibidas"].std()]
-    if not picos.empty:
-        for _, fila in picos.iterrows():
-            st.warning(f"Pico de llamadas detectado el {fila['Fecha']} ({fila['DíaSemana']}) con {fila['LlamadasRecibidas']} llamadas.")
+    agentes_unicos_tab5 = sorted(df_expandido_filtrado["AgenteFinal"].unique())
+    agente_tab5_seleccionado = st.selectbox("Selecciona un agente para análisis", agentes_unicos_tab5)
+
+    df_agente = df_expandido_filtrado[df_expandido_filtrado["AgenteFinal"] == agente_tab5_seleccionado]
+    df_agente_talktime = df_agente[~df_agente["LlamadaPerdida"]].copy()
+    df_agente_talktime["TalkTime_seg"] = df_agente_talktime["Talk Time"].dt.total_seconds()
+    df_agente["RingTime_seg"] = df_agente["Ring Time"].dt.total_seconds()
+
+    # Histograma Talk Time
+    fig_dist, ax_dist = plt.subplots(figsize=(10, 4))
+    sns.histplot(df_agente_talktime["TalkTime_seg"], bins=30, kde=True, ax=ax_dist)
+    ax_dist.set_xlabel("Duración de llamada (segundos)")
+    ax_dist.set_title(f"Distribución Duración de Llamadas Atendidas - {agente_tab5_seleccionado}")
+    st.pyplot(fig_dist)
+
+    promedio_talk = df_agente_talktime["TalkTime_seg"].mean()
+    st.markdown(f"**Promedio Talk Time:** {promedio_talk:.2f} segundos")
+
+    # Histograma Ring Time
+    fig_ring, ax_ring = plt.subplots(figsize=(10, 4))
+    sns.histplot(df_agente["RingTime_seg"], bins=30, kde=True, ax=ax_ring, color="orange")
+    ax_ring.set_xlabel("Ring Time (segundos)")
+    ax_ring.set_title(f"Distribución de Ring Time - {agente_tab5_seleccionado}")
+    st.pyplot(fig_ring)
+
+    promedio_ring = df_agente["RingTime_seg"].mean()
+    st.markdown(f"**Promedio Ring Time:** {promedio_ring:.2f} segundos")
+
+    # Alertas simple (ejemplo: días con productividad menor a 90% para agente seleccionado)
+    detalle_agente = detalle[(detalle["AgenteFinal"] == agente_tab5_seleccionado) & (detalle["Fecha"] >= fecha_inicio) & (detalle["Fecha"] <= fecha_fin)]
+    dias_alerta = detalle_agente[detalle_agente["Productividad (%)"] < 90]
+
+    if not dias_alerta.empty:
+        st.warning(f"Días con productividad < 90% para {agente_tab5_seleccionado}:")
+        st.dataframe(dias_alerta[["Fecha", "Productividad (%)", "LlamadasTotales", "LlamadasPerdidas"]])
     else:
-        st.info("No se detectaron picos inusuales de llamadas en el rango seleccionado.")
+        st.success(f"No se detectaron días con productividad menor a 90% para {agente_tab5_seleccionado}.")
