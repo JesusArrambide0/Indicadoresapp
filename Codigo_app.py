@@ -167,6 +167,17 @@ with tab1:
     porcentaje_cumplen = (dias_cumplen / total_dias * 100) if total_dias > 0 else 0
 
     st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
+    
+    # Gráfico líneas productividad
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.lineplot(data=df_productividad, x="Fecha", y="Productividad (%)", marker="o", ax=ax)
+    ax.axhline(97, color="green", linestyle="--", label="Meta 97%")
+    ax.axhline(90, color="orange", linestyle="--", label="Alerta 90%")
+    ax.set_ylim(0, 105)
+    ax.set_ylabel("Productividad (%)")
+    ax.set_title("Productividad diaria")
+    ax.legend()
+    st.pyplot(fig)
 
 with tab2:
     st.subheader("Detalle de llamadas por Programador")
