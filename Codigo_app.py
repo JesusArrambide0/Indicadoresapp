@@ -168,7 +168,7 @@ with tab1:
 
     st.markdown(f"**{dias_cumplen}** días cumplen con productividad ≥ 97% de un total de **{total_dias}** días ({porcentaje_cumplen:.2f}%)")
     
-    # Gráfico líneas productividad
+     # Gráfico líneas productividad
     fig, ax = plt.subplots(figsize=(10, 4))
     sns.lineplot(data=df_productividad, x="Fecha", y="Productividad (%)", marker="o", ax=ax)
     ax.axhline(97, color="green", linestyle="--", label="Meta 97%")
@@ -177,6 +177,8 @@ with tab1:
     ax.set_ylabel("Productividad (%)")
     ax.set_title("Productividad diaria")
     ax.legend()
+    ax.grid(True, linestyle="--", alpha=0.6)
+    plt.xticks(rotation=45, ha="right")
     st.pyplot(fig)
 
 with tab2:
