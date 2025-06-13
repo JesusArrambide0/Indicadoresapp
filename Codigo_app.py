@@ -170,14 +170,10 @@ with tab1:
 
 with tab2:
     st.subheader("Detalle de llamadas por agente")
-    
-    agentes_seleccionados = st.multiselect(
-        "Selecciona agente(s):",
-        options=detalle["AgenteFinal"].unique(),
-        default=detalle["AgenteFinal"].unique()
-    )
+    agentes_unicos_tab2 = sorted(detalle["AgenteFinal"].unique())
+    agente_tab2_seleccionado = st.selectbox("Selecciona un agente para análisis", agentes_unicos_tab2)
 
-    detalle_filtrado = detalle[detalle["AgenteFinal"].isin(agentes_seleccionados)]
+    detalle_filtrado = detalle[detalle["AgenteFinal"] == agente_tab2_seleccionado]
 
        # Tabla resumen filtrada y coloreada
     def color_fila_tab2(row):
